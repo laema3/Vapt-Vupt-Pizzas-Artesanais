@@ -11,7 +11,7 @@ export const compressImage = async (file: File, maxSizeMB: number = 1): Promise<
         if (!ctx) return reject('Canvas context not available');
         let width = img.width;
         let height = img.height;
-        const maxDimension = 1200;
+        const maxDimension = 800;
         if (width > height) {
           if (width > maxDimension) {
             height *= maxDimension / width;
@@ -28,10 +28,10 @@ export const compressImage = async (file: File, maxSizeMB: number = 1): Promise<
         ctx.drawImage(img, 0, 0, width, height);
         
         const mimeType = file.type === 'image/png' ? 'image/png' : 'image/webp';
-        let quality = 0.9;
+        let quality = 0.8;
         let dataUrl = canvas.toDataURL(mimeType, quality);
         
-        while (dataUrl.length / 1024 / 1024 > maxSizeMB && quality > 0.1) {
+        while (dataUrl.length > 700000 && quality > 0.1) {
           quality -= 0.1;
           dataUrl = canvas.toDataURL(mimeType, quality);
         }

@@ -1,0 +1,6 @@
+{
+  "firestore": {
+    "database": "ai-studio-remixvapitvupt-828394e0-76ab-4611-a5cc-06a8cc2345f6",
+    "rules": "firestore.rules"
+  }
+}

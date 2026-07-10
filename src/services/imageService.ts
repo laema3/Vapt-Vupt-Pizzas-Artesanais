@@ -27,7 +27,7 @@ export const compressImage = async (file: File, maxSizeMB: number = 1): Promise<
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
         
-        const mimeType = file.type === 'image/png' ? 'image/png' : 'image/webp';
+        const mimeType = 'image/webp';
         let quality = 0.8;
         let dataUrl = canvas.toDataURL(mimeType, quality);
         

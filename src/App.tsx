@@ -1019,7 +1019,7 @@ const App: React.FC = () => {
   if (isKioskMode && !kioskStarted && !showAdminPanel) {
     return (
       <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center cursor-pointer select-none overflow-hidden" onClick={() => setKioskStarted(true)}>
-        <div className="absolute inset-0 z-0 bg-[#FFDE21]">
+        <div className="absolute inset-0 z-0 bg-slate-100">
         </div>
         <div className="relative z-10 flex flex-col items-center gap-10 animate-in zoom-in duration-500 w-full max-w-4xl px-4 text-center">
           <div className="w-48 h-48 sm:w-64 sm:h-64 bg-black/5 backdrop-blur-sm rounded-full flex items-center justify-center p-4 border-4 border-black/10 shadow-xl animate-bounce-subtle">
@@ -1244,7 +1244,7 @@ const App: React.FC = () => {
         ) : (
           <div className="flex flex-col w-full items-center">
             {!isKioskMode && !forcedDeliveryType && activeView === 'home' && (
-              <section className="relative w-full bg-[#FFDE21] flex items-center justify-center overflow-hidden py-8">
+              <section className="relative w-full bg-slate-100 flex items-center justify-center overflow-hidden py-8">
                 <div className="relative z-10 text-center px-4 flex flex-col items-center">
                     {!isStoreOpen && <div className="mb-4 mx-4 bg-red-600 text-white px-6 py-2 rounded-full font-black uppercase text-xs animate-pulse shadow-lg">ESTAMOS FECHADOS NO MOMENTO</div>}
                     
@@ -1280,7 +1280,7 @@ const App: React.FC = () => {
                         <img 
                           src={logoUrl} 
                           alt="Logo VAPT VUPT" 
-                          className="w-28 h-28 sm:w-36 sm:h-36 object-contain border-4 border-yellow-400 rounded-full" 
+                          className="w-28 h-28 sm:w-36 sm:h-36 object-contain border-4 border-slate-200 rounded-full" 
                           referrerPolicy="no-referrer"
                         />
                       </div>

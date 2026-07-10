@@ -1368,28 +1368,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                         </div>
                      </div>
                   </section>
-
-                  {/* IMPORTAÇÃO DE CLIENTES SQL */}
-                  <section className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
-                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
-                       <span className="w-10 h-10 bg-red-600 text-white rounded-xl flex items-center justify-center text-xl">📥</span>
-                       Importar Clientes (SQL)
-                     </h3>
-                     <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-200">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Selecione um arquivo .sql para importar seus clientes antigos.</p>
-                        <input 
-                          type="file" 
-                          accept=".sql" 
-                          onChange={handleImportSQL}
-                          className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-slate-900 file:text-white cursor-pointer" 
-                        />
-                        {isImporting && (
-                          <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl text-[10px] font-bold text-red-600 uppercase animate-pulse">
-                            {importLog}
-                          </div>
-                        )}
-                     </div>
-                  </section>
                   
                   <section className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
@@ -1414,156 +1392,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                             </div>
                          </div>
                       </div>
-
-                      <div className="pt-6 border-t border-slate-100 space-y-4">
-                         <h4 className="text-xs font-black uppercase tracking-widest text-slate-500">🛠️ Operações de Limpeza no Banco de Dados</h4>
-                         <div className="flex flex-wrap gap-4">
-                        <button
-                           onClick={() => setShowMaintenanceConfirm(true)}
-                           className="bg-red-600 text-white py-4 px-8 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-md active:scale-95 animate-in fade-in"
-                        >
-                          Remover Duplicados
-                        </button>
-                        <button
-                           onClick={() => setShowZeroStockConfirm(true)}
-                           className="bg-amber-500 text-white py-4 px-8 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-amber-600 transition-all shadow-md active:scale-95 animate-in fade-in"
-                        >
-                          🚧 Zerar Estoque de Todos
-                        </button>
-                        <button
-                           onClick={() => setShowRestoreStockConfirm(true)}
-                           className="bg-emerald-600 text-white py-4 px-8 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95 animate-in fade-in"
-                        >
-                          🌐 Restaurar Estoque de Todos
-                        </button>
-                        <button
-                           onClick={() => setShowDeleteAllProductsConfirm(true)}
-                           className="bg-red-800 text-white py-4 px-8 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-red-900 transition-all shadow-md active:scale-95 animate-in fade-in"
-                        >
-                          🗑️ Deletar Todos os Produtos (Real)
-                        </button>
-                        <button
-                           onClick={() => setShowDeleteAllComplementsConfirm(true)}
-                           className="bg-rose-800 text-white py-4 px-8 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-rose-900 transition-all shadow-md active:scale-95 animate-in fade-in"
-                        >
-                          🗑️ Deletar Todos os Adicionais (Real)
-                         </button>
-                      </div>
-                      </div>
-                      {showMaintenanceConfirm && (
-                        <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
-                          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl">
-                             <h3 className="text-xl font-black text-slate-800 mb-4">Confirmar Exclusão</h3>
-                             <p className="text-slate-600 mb-8 font-medium text-sm">Tem certeza que deseja excluir todos os produtos duplicados?</p>
-                             <div className="flex gap-4">
-                                <button onClick={() => setShowMaintenanceConfirm(false)} className="flex-1 px-6 py-4 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Cancelar</button>
-                                <button onClick={async () => {
-                                   setShowMaintenanceConfirm(false);
-                                   
-                                   try {
-                                     const firestoreDb = dbService.getDb();
-                                     if (!firestoreDb) {
-                                       throw new Error("Conexão com o banco de dados não disponível.");
-                                     }
-
-                                     setOperationProgress({
-                                       active: true,
-                                       label: "Analisando duplicados no banco...",
-                                       current: 0,
-                                       total: 100,
-                                       percentage: 0
-                                     });
-
-                                     // Duplicate Products
-                                     const allProducts = await dbService.getAll<any>('products');
-                                     const seenProducts = new Set();
-                                     const duplicateProducts = [];
-
-                                     for (const p of allProducts) {
-                                        if (p && p.name) {
-                                           const normalizedName = p.name.trim().toLowerCase();
-                                           if (seenProducts.has(normalizedName)) {
-                                              duplicateProducts.push(p);
-                                           } else {
-                                              seenProducts.add(normalizedName);
-                                           }
-                                        }
-                                     }
-
-                                     // Duplicate Complements
-                                     const allComplements = await dbService.getAll<any>('complements');
-                                     const seenComplements = new Set();
-                                     const duplicateComplements = [];
-
-                                     for (const p of allComplements) {
-                                        if (p && p.name) {
-                                           const normalizedName = p.name.trim().toLowerCase();
-                                           if (seenComplements.has(normalizedName)) {
-                                              duplicateComplements.push(p);
-                                           } else {
-                                              seenComplements.add(normalizedName);
-                                           }
-                                        }
-                                     }
-
-                                     const totalToDelete = duplicateProducts.length + duplicateComplements.length;
-                                     
-                                     if (totalToDelete === 0) {
-                                        setOperationProgress(null);
-                                        alert("Nenhum item duplicado encontrado para remover.");
-                                        return;
-                                     }
-
-                                     let currentProcessed = 0;
-                                     setOperationProgress({
-                                       active: true,
-                                       label: `Removendo ${totalToDelete} itens duplicados...`,
-                                       current: 0,
-                                       total: totalToDelete,
-                                       percentage: 0
-                                     });
-
-                                     // Create flat list of deletes
-                                     const itemsToDelete = [
-                                       ...duplicateProducts.map(p => ({ collection: 'products', id: p.id })),
-                                       ...duplicateComplements.map(c => ({ collection: 'complements', id: c.id }))
-                                     ];
-
-                                     const chunkSize = 200;
-                                     for (let i = 0; i < itemsToDelete.length; i += chunkSize) {
-                                       const chunk = itemsToDelete.slice(i, i + chunkSize);
-                                       const batch = writeBatch(firestoreDb);
-                                       
-                                       for (const item of chunk) {
-                                         const docRef = doc(firestoreDb, item.collection, item.id);
-                                         batch.delete(docRef);
-                                       }
-                                       
-                                       await batch.commit();
-                                       currentProcessed += chunk.length;
-                                       setOperationProgress({
-                                         active: true,
-                                         label: `Removendo ${totalToDelete} itens duplicados...`,
-                                         current: currentProcessed,
-                                         total: totalToDelete,
-                                         percentage: Math.round((currentProcessed / totalToDelete) * 100)
-                                       });
-                                     }
-
-                                     setOperationProgress(null);
-                                     alert(`Foram removidos ${totalToDelete} itens duplicados com sucesso! (${duplicateProducts.length} produtos e ${duplicateComplements.length} adicionais).`);
-                                     window.location.reload();
-                                   } catch (err: any) {
-                                     console.error("Erro ao remover duplicados:", err);
-                                     setOperationProgress(null);
-                                     alert("Erro ao remover duplicados: " + (err?.message || err));
-                                   }
-                                }} className="flex-1 px-6 py-4 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700">Confirmar</button>
-                             </div>
-                          </div>
-                      </div>
-                      )}
-                      
                   </section>
 
                   {operationProgress && operationProgress.active && (
@@ -1926,13 +1754,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                            <label className={labelClass}>Senha Administrativa</label>
                            <input type="password" value={localAdminPass} onChange={e => setLocalAdminPass(e.target.value)} placeholder="••••••••" className={inputClass} />
                         </div>
-                        <div className="space-y-1 opacity-30 grayscale pointer-events-none cursor-not-allowed select-none">
+                        <div className="space-y-1">
                            <label className={labelClass}>Senha Portal Entregador</label>
-                           <input type="password" value={localMotoboyPass} onChange={e => setLocalMotoboyPass(e.target.value)} placeholder="••••••••" className={inputClass} disabled />
+                           <input type="password" value={localMotoboyPass} onChange={e => setLocalMotoboyPass(e.target.value)} placeholder="••••••••" className={inputClass} />
                         </div>
-                        <div className="space-y-1 opacity-30 grayscale pointer-events-none cursor-not-allowed select-none">
+                        <div className="space-y-1">
                            <label className={labelClass}>Senha Acesso Garçom</label>
-                           <input type="password" value={localWaiterPass} onChange={e => setLocalWaiterPass(e.target.value)} placeholder="••••••••" className={inputClass} disabled />
+                           <input type="password" value={localWaiterPass} onChange={e => setLocalWaiterPass(e.target.value)} placeholder="••••••••" className={inputClass} />
                         </div>
                         <div className="flex items-end">
                            <button 

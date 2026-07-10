@@ -1,0 +1,160 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A food product in the menu",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "image": { "type": "string" },
+        "rating": { "type": "number" },
+        "calories": { "type": "number" },
+        "complements": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "price", "category"]
+    },
+    "CategoryItem": {
+      "title": "Category",
+      "description": "A product category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "SubCategoryItem": {
+      "title": "SubCategory",
+      "description": "A product sub-category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["categoryId", "name"]
+    },
+    "Complement": {
+      "title": "Complement",
+      "description": "An optional food complement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "active": { "type": "boolean" },
+        "applicable_categories": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "price", "active"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerAddress": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "total": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "deliveryType": { "type": "string", "enum": ["DELIVERY", "PICKUP"] },
+        "discountValue": { "type": "number" },
+        "couponCode": { "type": "string" },
+        "pointsEarned": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "changeFor": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "motoboyName": { "type": "string" },
+        "currentLocation": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "timestamp": { "type": "number" }
+          }
+        }
+      },
+      "required": ["customerId", "items", "total", "status", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "A registered customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "zipCode": { "type": "string" },
+        "totalOrders": { "type": "number" },
+        "points": { "type": "number" },
+        "lastOrder": { "type": "string" },
+        "isBlocked": { "type": "boolean" }
+      },
+      "required": ["email", "name"]
+    },
+    "ZipRange": {
+      "title": "ZipRange",
+      "description": "Delivery fee by ZIP range",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "start": { "type": "string" },
+        "end": { "type": "string" },
+        "fee": { "type": "number" }
+      },
+      "required": ["start", "end", "fee"]
+    },
+    "PaymentSettings": {
+      "title": "PaymentSettings",
+      "description": "Payment method configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["ONLINE", "DELIVERY"] },
+        "integration": { "type": "string", "enum": ["MERCADO_PAGO", "PAGSEGURO", "NONE"] },
+        "token": { "type": "string" },
+        "email": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name", "enabled", "type"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "A discount coupon",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "discount": { "type": "number" },
+        "type": { "type": "string", "enum": ["PERCENT", "FIXED"] },
+        "active": { "type": "boolean" }
+      },
+      "required": ["code", "discount", "type", "active"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": { "schema": "Product", "description": "Menu products" },
+    "/categories/{categoryId}": { "schema": "CategoryItem", "description": "Product categories" },
+    "/subCategories/{subCategoryId}": { "schema": "SubCategoryItem", "description": "Product sub-categories" },
+    "/complements/{complementId}": { "schema": "Complement", "description": "Product complements" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Customer orders" },
+    "/customers/{customerId}": { "schema": "Customer", "description": "Customer profiles" },
+    "/zipRanges/{zipRangeId}": { "schema": "ZipRange", "description": "Delivery ZIP ranges" },
+    "/paymentSettings/{paymentSettingId}": { "schema": "PaymentSettings", "description": "Payment configurations" },
+    "/coupons/{couponId}": { "schema": "Coupon", "description": "Discount coupons" }
+  }
+}

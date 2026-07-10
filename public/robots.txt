@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bertimpastelhotdog.com.br/sitemap.xml
+Host: https://bertimpastelhotdog.com.br

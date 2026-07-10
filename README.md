@@ -1,11 +1,15 @@
-<div align="center">
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+# 🍔 BERTIM - Pastel e Hotdog
 
-  <h1>Built with AI Studio</h2>
+Seu site de delivery já está configurado e pronto para testes locais!
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## ✨ Como testar agora
+O site deve aparecer na janela ao lado (Preview).
+Você pode navegar, adicionar itens ao carrinho e conversar com o assistente virtual.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## 🛠️ Funcionalidades Ativas
+- **Cardápio Digital:** Produtos de exemplo já carregados.
+- **Chatbot (IA):** Funcionando com a chave configurada.
+- **Painel Admin:** Acesse clicando em "Acesso" no rodapé (Usuário: `admin`, Senha: `admin123`).
 
-</div>
+Não se preocupe com configurações complexas de GitHub ou Vercel agora. Divirta-se testando seu novo app aqui mesmo!

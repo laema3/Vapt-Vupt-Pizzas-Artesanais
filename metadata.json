@@ -1,0 +1,11 @@
+{
+  "name": "Remix: VAPIT VUPT",
+  "short_name": "BERTIM",
+  "description": "As Melhores Pizzas Artesanais de Uberaba!",
+  "homepage": "https://delivery.com.br",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>BERTIM - Pastel e Hotdog</title>
+    
+    <!-- SEO e Identidade de Domínio -->
+    <link rel="canonical" href="https://delivery.com.br" />
+    <meta name="description" content="Peça o melhor pastel e hotdog da região pelo nosso site oficial">
+    
+    <!-- OpenGraph -->
+    <meta property="og:title" content="BERTIM - Pastel e Hotdog">
+    <meta property="og:description" content="Pastéis crocantes e hotdogs recheados. Peça agora!">
+    <meta property="og:url" content="https://delivery.com.br">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://instagram.fpoj7-1.fna.fbcdn.net/v/t51.82787-19/627350947_17850571731632437_2511244480226066334_n.jpg?stp=dst-jpg_s150x150_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby45NjAuYzIifQ&_nc_ht=instagram.fpoj7-1.fna.fbcdn.net&_nc_cat=101&_nc_oc=Q6cZ2gHi3UvkzGuZlUOKhTh6FVg9jvZLjhZymNgChfjM-6WvnuM5jcUx4f1-KGdC3XyRL_c&_nc_ohc=SY_djTI7q5MQ7kNvwFLDAbq&_nc_gid=Ly9t_6tSJtPoyYc3C9jRHw&edm=AP4sbd4BAAAA&ccb=7-5&oh=00_AfzUxL5AWF_HJLIaKcS8PJgM0G9pSuDk17Q8KKbvoYhATg&oe=69C74D0B&_nc_sid=7a9f4b">
+
+    <!-- ÍCONES DINÂMICOS (IDs para manipulação via App.tsx) -->
+    <link id="app-favicon" rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3075/3075977.png">
+    <link id="app-apple-touch-icon" rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3075/3075977.png">
+    
+    <link id="app-manifest" rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#EAB308">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BERTIM">
+
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { background-color: #f8fafc; margin: 0; min-height: 100vh; font-family: 'Plus Jakarta Sans', sans-serif; }
+        #root { display: flex; flex-direction: column; min-height: 100vh; }
+        .initial-loader {
+            position: fixed; inset: 0; background: white; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease-out;
+        }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Ajuste do Mapa */
+        #delivery-map { height: 300px; width: 100%; border-radius: 20px; z-index: 10; }
+    </style>
+
+</head>
+<body class="antialiased">
+    <div id="initial-loader" class="initial-loader">
+        <img id="loader-logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" alt="Logo BERTIM" style="width: 120px; height: 120px; object-contain: contain; animation: pulse 2s infinite ease-in-out;">
+    </div>
+    <div id="root"></div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (let registration of registrations) {
+                    registration.unregister();
+                }
+            }).catch(function(err) {
+                console.log('Service Worker unregistration failed: ', err);
+            });
+        }
+        
+        // Safety timeout to remove loader if app fails to load
+        setTimeout(function() {
+            var loader = document.getElementById('initial-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(function() { loader.remove(); }, 500);
+            }
+        }, 4000);
+    </script>
+    <script type="module" src="/src/index.tsx"></script>
+</body>
+</html>

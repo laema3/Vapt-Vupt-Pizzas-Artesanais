@@ -55,7 +55,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, i
     const menuContext = products.map(p => `${p.name} (${p.category}): R$ ${p.price.toFixed(2)} - ${p.description}`).join('\n');
     
     const systemInstruction = `
-      Você é o BertimBot, o assistente virtual inteligente e simpático do BERTIM - Pastel e Hotdog.
+      Você é o BertimBot, o assistente virtual inteligente e simpático do VAPT VUPT - Pastel e Hotdog.
       Seu objetivo é ajudar os clientes a escolherem pastéis e hotdogs, tirar dúvidas e realizar pedidos.
       
       CONTEXTO DA LOJA:

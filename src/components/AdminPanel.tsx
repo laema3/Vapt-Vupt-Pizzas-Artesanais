@@ -334,7 +334,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           </div>
           <div class="footer">
             <p>Obrigado pela preferência!</p>
-            <p>CNPJ: 64.412.248/0001-42 - BERTIM PASTEL E HOTDOG LTDA</p>
+            <p>CNPJ: 64.412.248/0001-42 - VAPT VUPT PASTEL E HOTDOG LTDA</p>
             <p>AV. LUCAS BORGES, 586 - FABRÍCIO</p>
             <p>UBERABA - MG - FONE: 34-9-9262-7077</p>
             <p>IE: 53999960035</p>
@@ -1356,7 +1356,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
                         <div className="space-y-3 md:col-span-2">
                            <label className={labelClass}>Nome da Loja</label>
-                           <input type="text" value={storeName} onChange={(e) => onUpdateStoreName(e.target.value)} className={inputClass} placeholder="BERTIM" />
+                           <input type="text" value={storeName} onChange={(e) => onUpdateStoreName(e.target.value)} className={inputClass} placeholder="VAPT VUPT" />
                         </div>
 
                         <div className="space-y-3 md:col-span-2">

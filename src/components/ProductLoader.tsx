@@ -13,7 +13,7 @@ export const ProductLoader: React.FC<ProductLoaderProps> = ({ logoUrl, showRetry
         {logoUrl ? (
           <img 
             src={logoUrl} 
-            alt="Logo BERTIM" 
+            alt="Logo VAPT VUPT" 
             className="w-48 h-48 object-contain" 
             referrerPolicy="no-referrer" 
           />

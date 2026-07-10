@@ -51,14 +51,17 @@ const App: React.FC = () => {
   const [isKioskMode, setIsKioskMode] = useState(() => safeStorage.getItem('nl_kiosk_enabled') === 'true');
   const [kioskStarted, setKioskStarted] = useState(false);
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO);
-  const [storeName, setStoreName] = useState('BERTIM');
+  const [storeName, setStoreName] = useState('VAPT VUPT');
   const [themeColor, setThemeColor] = useState(() => safeStorage.getItem('nl_theme_color') || 'red');
   const [socialLinks, setSocialLinks] = useState({ 
-
     instagram: '', whatsapp: '', facebook: '', 
     googleTagId: '', facebookPixelId: '', instagramPixelId: '',
     address: '', city: ''
   });
+
+  useEffect(() => {
+    document.title = storeName || 'Delivery';
+  }, [storeName]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -235,8 +238,8 @@ const App: React.FC = () => {
 
       // 2. Gera manifesto dinâmico para garantir o ícone do App instalado
       const dynamicManifest = {
-        "short_name": "BERTIM",
-        "name": "BERTIM - Pastel e Hotdog",
+        "short_name": "VAPT VUPT",
+        "name": "VAPT VUPT - Pastel e Hotdog",
         "description": "O melhor pastel e hotdog da região na palma da sua mão.",
         "categories": ["food", "shopping"],
         "icons": [
@@ -259,7 +262,7 @@ const App: React.FC = () => {
             "sizes": "1080x1920",
             "type": "image/jpeg",
             "form_factor": "narrow",
-            "label": "Cardápio BERTIM"
+            "label": "Cardápio VAPT VUPT"
           },
           {
             "src": "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=1920&h=1080&fit=crop",
@@ -1036,7 +1039,7 @@ const App: React.FC = () => {
                   filter: 'drop-shadow(4px 4px 0 rgba(0,0,0,0.5))'
                 }}
               >
-                BERTIM
+                VAPT VUPT
               </h1>
               <h2 
                 className="font-black text-3xl sm:text-5xl uppercase tracking-tighter mt-2" 
@@ -1256,7 +1259,7 @@ const App: React.FC = () => {
                                 filter: 'drop-shadow(4px 4px 0 rgba(0,0,0,0.5))'
                               }}
                             >
-                              BERTIM
+                              VAPT VUPT
                             </h1>
                             <h2 
                               className="font-black text-3xl sm:text-5xl uppercase tracking-tighter mt-2" 
@@ -1276,7 +1279,7 @@ const App: React.FC = () => {
                       <div className="relative flex flex-col items-center p-1 mb-2">
                         <img 
                           src={logoUrl} 
-                          alt="Logo BERTIM" 
+                          alt="Logo VAPT VUPT" 
                           className="w-28 h-28 sm:w-36 sm:h-36 object-contain border-4 border-yellow-400 rounded-full" 
                           referrerPolicy="no-referrer"
                         />

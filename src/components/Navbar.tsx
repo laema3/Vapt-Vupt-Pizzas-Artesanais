@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="relative group">
                 <input 
                   type="text" 
-                  placeholder="Buscar pastel ou hotdog..." 
+                  placeholder="Buscar pizzas artesanais..." 
                   value={searchTerm}
                   onChange={(e) => onSearchChange(e.target.value)}
                   className="w-full bg-slate-100 border-none rounded-2xl py-3 pl-12 pr-4 text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 transition-all group-hover:bg-white group-hover:shadow-md"

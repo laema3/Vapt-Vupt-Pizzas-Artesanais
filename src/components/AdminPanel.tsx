@@ -4,6 +4,7 @@ import { Product, Order, Customer, ZipRange, CategoryItem, SubCategoryItem, Orde
 import { compressImage } from '../services/imageService.ts';
 import { dbService } from '../services/dbService.ts';
 import { writeBatch, doc } from 'firebase/firestore';
+import { PizzaPricingCalculator } from "./PizzaPricingCalculator.tsx";
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 const APP_VERSION = "v6.0 (Subcategorias & Import SQL)";
@@ -601,6 +602,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           
           <div className="pt-6 pb-2 px-4 text-xs font-black text-slate-600 uppercase tracking-widest">Gestão</div>
           <NavItem active={activeView === 'cupons'} icon="🏷️" label="Cupons" onClick={() => setActiveView('cupons')} />
+          <NavItem active={activeView === 'precificacao'} icon="🍕" label="Precificação" onClick={() => setActiveView('precificacao')} />
           <NavItem active={activeView === 'entregas'} icon="🚚" label="Taxas Frete" onClick={() => setActiveView('entregas')} />
           <NavItem active={activeView === 'clientes'} icon="👥" label="Clientes" onClick={() => setActiveView('clientes')} />
           <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => setActiveView('pagamentos')} />
@@ -971,6 +973,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                      ))}
                   </div>
                </div>
+            )}
+
+                        {activeView === 'precificacao' && (
+              <PizzaPricingCalculator />
             )}
 
             {activeView === 'entregas' && (

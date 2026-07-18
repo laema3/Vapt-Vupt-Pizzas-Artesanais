@@ -1244,28 +1244,34 @@ const App: React.FC = () => {
         ) : (
           <div className="flex flex-col w-full items-center">
             {!isKioskMode && !forcedDeliveryType && activeView === 'home' && (
-              <section className="relative w-full bg-slate-100 flex items-center justify-center overflow-hidden py-8">
-                <div className="relative z-10 text-center px-4 flex flex-col items-center">
-                    {!isStoreOpen && <div className="mb-4 mx-4 bg-red-600 text-white px-6 py-2 rounded-full font-black uppercase text-xs animate-pulse shadow-lg">ESTAMOS FECHADOS NO MOMENTO</div>}
+              <section className="relative w-full flex items-center justify-center overflow-hidden py-16 sm:py-24">
+                {/* Background Image with Overlay */}
+                <div 
+                  className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+                  style={{ backgroundImage: "url('https://images.unsplash.com/photo-1528137871618-79d2761e3fd5?q=80&w=2070&auto=format&fit=crop')" }}
+                />
+                <div className="absolute inset-0 z-0 bg-black/60 backdrop-blur-[2px]"></div>
+
+                <div className="relative z-10 text-center px-4 flex flex-col items-center w-full max-w-4xl mx-auto">
+                    {!isStoreOpen && <div className="mb-8 mx-4 bg-red-600 text-white px-8 py-3 rounded-full font-black uppercase text-sm animate-pulse shadow-lg ring-4 ring-red-600/30">ESTAMOS FECHADOS NO MOMENTO</div>}
                     
                     {!logoUrl && (
-                      <div className="relative flex flex-col items-center p-1 sm:p-2 mb-4">
+                      <div className="relative flex flex-col items-center p-1 sm:p-2 mb-6">
                         <div className="relative z-10 flex flex-col items-center gap-0">
                           <>
                             <h1 
-                              className="font-black text-7xl sm:text-[130px] uppercase leading-[0.8] tracking-tighter" 
+                              className="font-black text-6xl sm:text-[110px] uppercase leading-[0.85] tracking-tighter text-white" 
                               style={{ 
-                                color: '#FFDE21',
-                                filter: 'drop-shadow(4px 4px 0 rgba(0,0,0,0.5))'
+                                filter: 'drop-shadow(4px 4px 0 rgba(0,0,0,0.8))'
                               }}
                             >
                               VAPT VUPT
                             </h1>
                             <h2 
-                              className="font-black text-3xl sm:text-5xl uppercase tracking-tighter mt-2" 
+                              className="font-black text-2xl sm:text-4xl uppercase tracking-tighter mt-4" 
                               style={{ 
-                                color: '#FF8C00',
-                                filter: 'drop-shadow(2px 2px 0 rgba(0,0,0,0.5))'
+                                color: '#FFDE21',
+                                filter: 'drop-shadow(2px 2px 0 rgba(0,0,0,0.8))'
                               }}
                             >
                               PASTEL & HOTDOG
@@ -1276,11 +1282,12 @@ const App: React.FC = () => {
                     )}
 
                     {logoUrl && (
-                      <div className="relative flex flex-col items-center p-1 mb-2">
+                      <div className="relative flex flex-col items-center p-1 mb-8 animate-in zoom-in duration-500">
+                        <div className="absolute inset-0 bg-white/20 blur-xl rounded-full"></div>
                         <img 
                           src={logoUrl} 
                           alt="Logo VAPT VUPT" 
-                          className="w-28 h-28 sm:w-36 sm:h-36 object-contain border-4 border-slate-200 rounded-full" 
+                          className="relative w-36 h-36 sm:w-48 sm:h-48 object-contain border-4 border-white shadow-2xl rounded-full bg-white/10 backdrop-blur-sm p-2" 
                           referrerPolicy="no-referrer"
                         />
                       </div>
@@ -1288,9 +1295,10 @@ const App: React.FC = () => {
 
                     <button 
                       onClick={() => document.getElementById('menu-anchor')?.scrollIntoView({behavior:'smooth'})} 
-                      className="mt-4 mb-4 mx-4 bg-red-600 text-white px-12 py-5 rounded-2xl font-black text-2xl border-b-8 border-red-800 uppercase shadow-2xl active:translate-y-1 transition-all"
+                      className="mt-4 mb-4 mx-4 bg-red-600 text-white px-12 py-5 rounded-full font-black text-xl sm:text-2xl border-b-8 border-red-800 uppercase shadow-2xl active:translate-y-1 active:border-b-0 hover:bg-red-500 transition-all flex items-center gap-3 group"
                     >
-                      Ver Cardápio
+                      <span>Ver Cardápio</span>
+                      <span className="group-hover:translate-y-1 transition-transform">👇</span>
                     </button>
                 </div>
               </section>

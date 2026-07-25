@@ -35,6 +35,8 @@ export const PizzaPricingCalculator: React.FC = () => {
   // New Recipe State
   const [newRecipeName, setNewRecipeName] = useState('');
   const [newRecipeMargin, setNewRecipeMargin] = useState('100'); // 100% margin standard
+  const [newRecipeSalePrice, setNewRecipeSalePrice] = useState('');
+  const [lastModifiedField, setLastModifiedField] = useState<'margin' | 'price'>('margin');
   const [currentRecipeIngredients, setCurrentRecipeIngredients] = useState<PizzaRecipeIngredient[]>([]);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [confirmDeleteRecipeId, setConfirmDeleteRecipeId] = useState<string | null>(null);
@@ -105,27 +107,92 @@ export const PizzaPricingCalculator: React.FC = () => {
     setConfirmDeleteIngredientId(null);
   };
 
+  const calculateRecipeCost = (recipeIngredients: PizzaRecipeIngredient[]) => {
+    return recipeIngredients.reduce((total, ri) => {
+      const ing = ingredients.find(i => i.id === ri.ingredientId);
+      if (!ing) return total;
+      
+      let costPerUnit = ing.cost;
+      let qty = ri.quantity;
+
+      return total + (costPerUnit * qty);
+    }, 0);
+  };
+
+  const handleMarginChange = (marginStr: string, currentIngs = currentRecipeIngredients) => {
+    setNewRecipeMargin(marginStr);
+    setLastModifiedField('margin');
+    const m = parseFloat(marginStr);
+    const cost = calculateRecipeCost(currentIngs);
+    if (!isNaN(m) && cost > 0) {
+      const calculatedPrice = cost * (1 + m / 100);
+      setNewRecipeSalePrice(calculatedPrice.toFixed(2));
+    } else if (marginStr === '') {
+      setNewRecipeSalePrice('');
+    }
+  };
+
+  const handleSalePriceChange = (priceStr: string, currentIngs = currentRecipeIngredients) => {
+    setNewRecipeSalePrice(priceStr);
+    setLastModifiedField('price');
+    const price = parseFloat(priceStr);
+    const cost = calculateRecipeCost(currentIngs);
+    if (!isNaN(price) && cost > 0) {
+      const calculatedMargin = ((price - cost) / cost) * 100;
+      setNewRecipeMargin(calculatedMargin.toFixed(1));
+    } else if (priceStr === '') {
+      setNewRecipeMargin('');
+    }
+  };
+
+  const syncPricingOnIngredientsChange = (updatedIngs: PizzaRecipeIngredient[]) => {
+    const cost = calculateRecipeCost(updatedIngs);
+    if (cost > 0) {
+      if (lastModifiedField === 'price' && newRecipeSalePrice !== '') {
+        const price = parseFloat(newRecipeSalePrice);
+        if (!isNaN(price)) {
+          const calculatedMargin = ((price - cost) / cost) * 100;
+          setNewRecipeMargin(calculatedMargin.toFixed(1));
+        }
+      } else {
+        const m = parseFloat(newRecipeMargin);
+        if (!isNaN(m)) {
+          const calculatedPrice = cost * (1 + m / 100);
+          setNewRecipeSalePrice(calculatedPrice.toFixed(2));
+        }
+      }
+    }
+  };
+
   const handleAddIngredientToRecipe = (ingredientId: string) => {
     if (!currentRecipeIngredients.find(i => i.ingredientId === ingredientId)) {
-      setCurrentRecipeIngredients([...currentRecipeIngredients, { ingredientId, quantity: 0 }]);
+      const updated = [...currentRecipeIngredients, { ingredientId, quantity: 0 }];
+      setCurrentRecipeIngredients(updated);
+      syncPricingOnIngredientsChange(updated);
     }
   };
 
   const updateRecipeIngredientQuantity = (ingredientId: string, quantity: number) => {
-    setCurrentRecipeIngredients(currentRecipeIngredients.map(i => i.ingredientId === ingredientId ? { ...i, quantity } : i));
+    const updated = currentRecipeIngredients.map(i => i.ingredientId === ingredientId ? { ...i, quantity } : i);
+    setCurrentRecipeIngredients(updated);
+    syncPricingOnIngredientsChange(updated);
   };
 
   const removeRecipeIngredient = (ingredientId: string) => {
-    setCurrentRecipeIngredients(currentRecipeIngredients.filter(i => i.ingredientId !== ingredientId));
+    const updated = currentRecipeIngredients.filter(i => i.ingredientId !== ingredientId);
+    setCurrentRecipeIngredients(updated);
+    syncPricingOnIngredientsChange(updated);
   };
 
   const handleSaveRecipe = async () => {
     if (!newRecipeName) return;
     
+    const marginToSave = parseFloat(newRecipeMargin) || 0;
+
     if (editingRecipeId) {
       const recipe = recipes.find(r => r.id === editingRecipeId);
       if (recipe) {
-        const updatedRecipe = { ...recipe, name: newRecipeName, ingredients: currentRecipeIngredients, margin: parseFloat(newRecipeMargin) };
+        const updatedRecipe = { ...recipe, name: newRecipeName, ingredients: currentRecipeIngredients, margin: marginToSave };
         await dbService.save('pizza_recipes', recipe.id, updatedRecipe);
         setRecipes(recipes.map(r => r.id === recipe.id ? updatedRecipe : r));
         setEditingRecipeId(null);
@@ -135,7 +202,7 @@ export const PizzaPricingCalculator: React.FC = () => {
         id: Math.random().toString(36).substring(7),
         name: newRecipeName,
         ingredients: currentRecipeIngredients,
-        margin: parseFloat(newRecipeMargin)
+        margin: marginToSave
       };
       await dbService.save('pizza_recipes', recipe.id, recipe);
       setRecipes([...recipes, recipe]);
@@ -143,12 +210,18 @@ export const PizzaPricingCalculator: React.FC = () => {
     
     setNewRecipeName('');
     setNewRecipeMargin('100');
+    setNewRecipeSalePrice('');
+    setLastModifiedField('margin');
     setCurrentRecipeIngredients([]);
   };
 
   const handleEditRecipe = (recipe: PizzaRecipe) => {
+    const cost = calculateRecipeCost(recipe.ingredients);
+    const price = cost * (1 + recipe.margin / 100);
     setNewRecipeName(recipe.name);
     setNewRecipeMargin(recipe.margin.toString());
+    setNewRecipeSalePrice(cost > 0 ? price.toFixed(2) : '');
+    setLastModifiedField('margin');
     setCurrentRecipeIngredients([...recipe.ingredients]);
     setEditingRecipeId(recipe.id);
     
@@ -158,6 +231,8 @@ export const PizzaPricingCalculator: React.FC = () => {
   const handleCancelEditRecipe = () => {
     setNewRecipeName('');
     setNewRecipeMargin('100');
+    setNewRecipeSalePrice('');
+    setLastModifiedField('margin');
     setCurrentRecipeIngredients([]);
     setEditingRecipeId(null);
   };
@@ -170,18 +245,6 @@ export const PizzaPricingCalculator: React.FC = () => {
       handleCancelEditRecipe();
     }
     setConfirmDeleteRecipeId(null);
-  };
-
-  const calculateRecipeCost = (recipeIngredients: PizzaRecipeIngredient[]) => {
-    return recipeIngredients.reduce((total, ri) => {
-      const ing = ingredients.find(i => i.id === ri.ingredientId);
-      if (!ing) return total;
-      
-      let costPerUnit = ing.cost;
-      let qty = ri.quantity;
-
-      return total + (costPerUnit * qty);
-    }, 0);
   };
 
   if (loading) return <div className="p-8 text-center animate-pulse font-bold text-slate-500">Carregando Calculadora...</div>;
@@ -286,8 +349,25 @@ export const PizzaPricingCalculator: React.FC = () => {
               <input type="text" value={newRecipeName} onChange={e => setNewRecipeName(e.target.value)} placeholder="Ex: Pizza Calabresa Grande" className={inputClass} />
             </div>
             <div className="space-y-1">
+              <label className={labelClass}>Valor Desejado de Venda (R$)</label>
+              <input 
+                type="number" 
+                step="0.01"
+                value={newRecipeSalePrice} 
+                onChange={e => handleSalePriceChange(e.target.value)} 
+                placeholder="Ex: 50.00" 
+                className={inputClass} 
+              />
+            </div>
+            <div className="space-y-1">
               <label className={labelClass}>Margem de Lucro Desejada (%)</label>
-              <input type="number" value={newRecipeMargin} onChange={e => setNewRecipeMargin(e.target.value)} placeholder="Ex: 100" className={inputClass} />
+              <input 
+                type="number" 
+                value={newRecipeMargin} 
+                onChange={e => handleMarginChange(e.target.value)} 
+                placeholder="Ex: 100" 
+                className={inputClass} 
+              />
             </div>
             
             <div className="space-y-2 pt-4">

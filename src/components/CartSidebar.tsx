@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
-import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange } from '../types';
+import { calculateDeliveryFeeForZip, fetchAddressByCep } from '../utils/zipUtils';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -9,7 +10,16 @@ interface CartSidebarProps {
   coupons: Coupon[];
   onUpdateQuantity: (id: string, delta: number) => void;
   onRemove: (id: string) => void;
-  onCheckout: (paymentMethod: string, fee: number, discount: number, couponCode: string, deliveryType: DeliveryType, changeFor?: number, tableId?: string) => void;
+  onCheckout: (
+    paymentMethod: string, 
+    fee: number, 
+    discount: number, 
+    couponCode: string, 
+    deliveryType: DeliveryType, 
+    changeFor?: number, 
+    tableId?: string,
+    deliveryAddressInfo?: { address: string; neighborhood: string; zipCode: string }
+  ) => void;
   onAuthClick: () => void;
   paymentSettings: PaymentSettings[];
   tables: any[];
@@ -23,12 +33,13 @@ interface CartSidebarProps {
   defaultTableId?: string;
   isAdmin?: boolean;
   forcedDeliveryType?: DeliveryType | null;
+  zipRanges?: ZipRange[];
 }
 
 export const CartSidebar: React.FC<CartSidebarProps> = ({ 
   isOpen, onClose, items, coupons, onUpdateQuantity, onRemove, onCheckout, onAuthClick, 
   paymentSettings, tables, currentUser, isKioskMode, deliveryFee, availableCoupons, isStoreOpen, isProcessing,
-  onShowToast, defaultTableId, isAdmin, forcedDeliveryType
+  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = []
 }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -36,6 +47,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const [changeFor, setChangeFor] = useState<number | undefined>(undefined);
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(defaultTableId ? 'TABLE' : null);
   const [selectedTableId, setSelectedTableId] = useState<string>(defaultTableId || '');
+
+  // Endereço e CEP para entrega
+  const [zipCode, setZipCode] = useState('');
+  const [address, setAddress] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [isFetchingAddress, setIsFetchingAddress] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      setZipCode(currentUser.zipCode || '');
+      setAddress(currentUser.address || '');
+      setNeighborhood(currentUser.neighborhood || '');
+    }
+  }, [currentUser, isOpen]);
 
   useEffect(() => {
     if (defaultTableId) {
@@ -56,9 +81,36 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
     }
   }, [deliveryType]);
 
+  // Função para buscar ViaCEP automaticamente quando o usuário digitar o CEP
+  const handleZipCodeChange = async (val: string) => {
+    setZipCode(val);
+    const clean = val.replace(/\D/g, '');
+    if (clean.length === 8) {
+      setIsFetchingAddress(true);
+      const res = await fetchAddressByCep(clean);
+      setIsFetchingAddress(false);
+      if (res && res.address) {
+        setAddress(res.address);
+        if (res.neighborhood) setNeighborhood(res.neighborhood);
+        if (onShowToast) onShowToast('Endereço localizado pelo CEP!', 'success');
+      } else if (res && res.error) {
+        if (onShowToast) onShowToast('CEP não localizado no sistema de Correios.', 'error');
+      }
+    }
+  };
+
+  // Cálculo dinâmico do valor do frete
+  const activeDeliveryFee = useMemo(() => {
+    if (deliveryType !== 'DELIVERY') return 0;
+    const targetZip = zipCode || currentUser?.zipCode || '';
+    if (!targetZip) return deliveryFee; // fallback para deliveryFee vindo do App se nenhum CEP fornecido
+    const calculated = calculateDeliveryFeeForZip(targetZip, zipRanges);
+    return calculated > 0 ? calculated : deliveryFee;
+  }, [deliveryType, zipCode, currentUser, zipRanges, deliveryFee]);
+
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const discount = appliedCoupon ? (appliedCoupon.type === 'PERCENT' ? subtotal * (appliedCoupon.discount / 100) : appliedCoupon.discount) : 0;
-  const total = subtotal + (deliveryType === 'DELIVERY' ? deliveryFee : 0) - discount;
+  const total = subtotal + (deliveryType === 'DELIVERY' ? activeDeliveryFee : 0) - discount;
 
   const handleApplyCoupon = () => {
     const coupon = coupons.find(c => c.code === couponCode && c.active);
@@ -79,6 +131,15 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         alert('FAVOR SELECIONAR ENTREGA, RETIRADA OU MESA');
       }
       return;
+    }
+
+    if (deliveryType === 'DELIVERY') {
+      if (!zipCode || !address || !neighborhood) {
+        const msg = 'Favor preencher o CEP e o endereço completo para entrega.';
+        if (onShowToast) onShowToast(msg, 'error');
+        else alert(msg);
+        return;
+      }
     }
 
     if (deliveryType === 'TABLE' && !selectedTableId) {
@@ -113,7 +174,18 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       ? `${paymentMethod}${suffix}`
       : paymentMethod;
 
-    onCheckout(finalPaymentMethod, deliveryType === 'DELIVERY' ? deliveryFee : 0, discount, appliedCoupon?.code || '', deliveryType, changeFor, selectedTableId);
+    const deliveryAddressInfo = deliveryType === 'DELIVERY' ? { address, neighborhood, zipCode } : undefined;
+
+    onCheckout(
+      finalPaymentMethod, 
+      deliveryType === 'DELIVERY' ? activeDeliveryFee : 0, 
+      discount, 
+      appliedCoupon?.code || '', 
+      deliveryType, 
+      changeFor, 
+      selectedTableId,
+      deliveryAddressInfo
+    );
   };
 
   if (!isOpen) return null;
@@ -192,6 +264,51 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     </>
                   )}
                 </div>
+
+                {deliveryType === 'DELIVERY' && (
+                  <div className="bg-white p-4 rounded-2xl border border-red-200 space-y-3 mt-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide">📍 Endereço de Entrega</h4>
+                      {isFetchingAddress && <span className="text-[10px] font-bold text-red-600 animate-pulse">Buscando CEP...</span>}
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">CEP</label>
+                      <input 
+                        type="text" 
+                        value={zipCode} 
+                        onChange={e => handleZipCodeChange(e.target.value)} 
+                        placeholder="Ex: 38000-000" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Endereço (Rua, Número, Comp.)</label>
+                      <input 
+                        type="text" 
+                        value={address} 
+                        onChange={e => setAddress(e.target.value)} 
+                        placeholder="Rua das Flores, 123" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Bairro</label>
+                      <input 
+                        type="text" 
+                        value={neighborhood} 
+                        onChange={e => setNeighborhood(e.target.value)} 
+                        placeholder="Centro" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                      />
+                    </div>
+                    {zipCode && (
+                      <div className="p-2.5 rounded-xl bg-red-50 border border-red-100 flex items-center justify-between text-xs font-bold">
+                        <span className="text-slate-600">Frete Calculado:</span>
+                        <span className="text-red-600 font-black">R$ {activeDeliveryFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-3">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cupom de Desconto</h3>
@@ -265,7 +382,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           <div className="p-6 bg-red-600 border-t border-red-500 space-y-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] z-20 text-white">
             <div className="space-y-2 text-xs font-bold text-red-100">
               <div className="flex justify-between"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>
-              {deliveryType === 'DELIVERY' && <div className="flex justify-between"><span>Taxa de Entrega</span><span>R$ {deliveryFee.toFixed(2)}</span></div>}
+              {deliveryType === 'DELIVERY' && <div className="flex justify-between"><span>Taxa de Entrega</span><span>R$ {activeDeliveryFee.toFixed(2)}</span></div>}
               {discount > 0 && <div className="flex justify-between text-white"><span>Desconto</span><span>- R$ {discount.toFixed(2)}</span></div>}
               <div className="flex justify-between text-lg font-black text-white pt-2 border-t border-red-500 mt-2"><span>Total</span><span>R$ {total.toFixed(2)}</span></div>
             </div>

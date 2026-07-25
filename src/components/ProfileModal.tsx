@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Customer } from '../types';
+import { fetchAddressByCep } from '../utils/zipUtils';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -59,7 +60,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, cus
           <input type="tel" placeholder="Telefone (WhatsApp)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
           <input type="text" placeholder="Endereço Completo" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
           <input type="text" placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
-          <input type="text" placeholder="CEP" value={zipCode} onChange={e => setZipCode(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
+          <input 
+            type="text" 
+            placeholder="CEP" 
+            value={zipCode} 
+            onChange={async (e) => {
+              const val = e.target.value;
+              setZipCode(val);
+              const clean = val.replace(/\D/g, '');
+              if (clean.length === 8) {
+                const res = await fetchAddressByCep(clean);
+                if (res && res.address) {
+                  setAddress(res.address);
+                  if (res.neighborhood) setNeighborhood(res.neighborhood);
+                }
+              }
+            }} 
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
+            required 
+          />
           
           <button type="submit" className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 active:scale-95 mt-6">
             Salvar Alterações

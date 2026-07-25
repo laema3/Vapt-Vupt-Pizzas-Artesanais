@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Customer, ZipRange } from '../types';
 import { dbService } from '../services/dbService';
+import { fetchAddressByCep } from '../utils/zipUtils';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -73,7 +74,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, 
               <input type="tel" placeholder="Telefone (WhatsApp)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
               <input type="text" placeholder="Endereço Completo" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
               <input type="text" placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
-              <input type="text" placeholder="CEP" value={zipCode} onChange={e => setZipCode(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
+              <input 
+                type="text" 
+                placeholder="CEP" 
+                value={zipCode} 
+                onChange={async (e) => {
+                  const val = e.target.value;
+                  setZipCode(val);
+                  const clean = val.replace(/\D/g, '');
+                  if (clean.length === 8) {
+                    const res = await fetchAddressByCep(clean);
+                    if (res && res.address) {
+                      setAddress(res.address);
+                      if (res.neighborhood) setNeighborhood(res.neighborhood);
+                    }
+                  }
+                }} 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
+                required 
+              />
             </>
           )}
           <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />

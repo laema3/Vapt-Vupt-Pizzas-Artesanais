@@ -22,6 +22,7 @@ import { InstallBanner } from './components/InstallBanner.tsx';
 import { RecessoBanner } from './components/RecessoBanner.tsx';
 import { dbService } from './services/dbService.ts';
 import { connectionError } from './firebaseConfig';
+import { calculateDeliveryFeeForZip } from './utils/zipUtils.ts';
 import { Product, CartItem, Order, Customer, ZipRange, PaymentSettings, CategoryItem, SubCategoryItem, Complement, DeliveryType, Coupon, Table } from './types.ts';
 import { safeStorage } from './utils/safeStorage.ts';
 import { DEFAULT_LOGO } from './constants.tsx';
@@ -634,16 +635,7 @@ const App: React.FC = () => {
 
   const currentDeliveryFee = useMemo(() => {
     if (!currentUser || !zipRanges.length || isKioskMode) return 0;
-    const rawZip = currentUser.zipCode.replace(/\D/g, '');
-    const numZip = parseInt(rawZip);
-    if (isNaN(numZip)) return 0;
-
-    const range = zipRanges.find(r => {
-      const start = parseInt(r.start.replace(/\D/g, ''));
-      const end = parseInt(r.end.replace(/\D/g, ''));
-      return numZip >= start && numZip <= end;
-    });
-    return range ? range.fee : 0;
+    return calculateDeliveryFeeForZip(currentUser.zipCode, zipRanges);
   }, [currentUser, zipRanges, isKioskMode]);
 
   const groupedMenu = useMemo(() => {
@@ -674,18 +666,55 @@ const App: React.FC = () => {
     setIsCartOpen(true);
   };
 
-  const handleCheckout = async (paymentMethod: string, fee: number, discount: number, couponCode: string, deliveryType: DeliveryType, changeFor?: number, tableId?: string) => {
+  const handleCheckout = async (
+    paymentMethod: string, 
+    fee: number, 
+    discount: number, 
+    couponCode: string, 
+    deliveryType: DeliveryType, 
+    changeFor?: number, 
+    tableId?: string,
+    deliveryAddressInfo?: { address: string; neighborhood: string; zipCode: string }
+  ) => {
     console.log("handleCheckout iniciado. Método:", paymentMethod);
     
     if (!currentUser && !isKioskMode && !isWaiterAuthenticated) return setIsAuthModalOpen(true);
 
-    if (currentUser && !isKioskMode && !isWaiterAuthenticated) {
-      if (!currentUser.email || !currentUser.phone || !currentUser.address || !currentUser.neighborhood || !currentUser.zipCode) {
+    if (deliveryAddressInfo && currentUser) {
+      const updatedUser: Customer = {
+        ...currentUser,
+        address: deliveryAddressInfo.address,
+        neighborhood: deliveryAddressInfo.neighborhood,
+        zipCode: deliveryAddressInfo.zipCode
+      };
+      setCurrentUser(updatedUser);
+      safeStorage.setItem('nl_current_user', JSON.stringify(updatedUser));
+      dbService.save('customers', currentUser.id, updatedUser);
+    }
+
+    const effectiveUser = deliveryAddressInfo && currentUser 
+      ? { ...currentUser, ...deliveryAddressInfo } 
+      : currentUser;
+
+    if (effectiveUser && !isKioskMode && !isWaiterAuthenticated) {
+      if (!effectiveUser.email || !effectiveUser.phone || !effectiveUser.address || !effectiveUser.neighborhood || !effectiveUser.zipCode) {
         setToast({ show: true, msg: 'Por favor, atualize seu cadastro com endereço completo, telefone e e-mail antes de fazer o pedido.', type: 'error' });
         setIsProfileModalOpen(true);
         return;
       }
     }
+
+    const formatUserAddress = (info?: { address: string; neighborhood: string; zipCode: string }, usr?: Customer | null) => {
+      const addr = info?.address || usr?.address || '';
+      const neigh = info?.neighborhood || usr?.neighborhood || '';
+      const zip = info?.zipCode || usr?.zipCode || '';
+      if (!addr) return 'LOCAL';
+      return `${addr}${neigh ? `, ${neigh}` : ''}${zip ? ` - CEP: ${zip}` : ''}`;
+    };
+
+    const resolvedAddress = deliveryType === 'PICKUP' 
+      ? 'RETIRADA' 
+      : (deliveryType === 'TABLE' ? `MESA ${tables.find(t => t.id === tableId)?.number || 'Desconhecida'}` : formatUserAddress(deliveryAddressInfo, effectiveUser));
 
     setIsOrderProcessing(true);
     try {
@@ -802,7 +831,7 @@ const App: React.FC = () => {
                  customerId: currentUser?.email || 'kiosk', 
                  customerName: currentUser?.name || 'Cliente Local', 
                  customerPhone: currentUser?.phone || '000',
-                 customerAddress: deliveryType === 'PICKUP' ? 'RETIRADA' : (deliveryType === 'TABLE' ? `MESA ${tables.find(t => t.id === tableId)?.number || 'Desconhecida'}` : (currentUser?.address || 'LOCAL')),
+                 customerAddress: resolvedAddress,
                  items: [...cart], 
                  total: total || 0, 
                  deliveryFee: fee || 0, 
@@ -862,7 +891,7 @@ const App: React.FC = () => {
                  customerId: currentUser?.email || 'kiosk', 
                  customerName: currentUser?.name || 'Cliente Local', 
                  customerPhone: currentUser?.phone || '000',
-                 customerAddress: deliveryType === 'PICKUP' ? 'RETIRADA' : (deliveryType === 'TABLE' ? `MESA ${tables.find(t => t.id === tableId)?.number || 'Desconhecida'}` : (currentUser?.address || 'LOCAL')),
+                 customerAddress: resolvedAddress,
                  items: [...cart], 
                  total: total || 0, 
                  deliveryFee: fee || 0, 
@@ -977,7 +1006,7 @@ const App: React.FC = () => {
         
         const newOrder: Order = {
           id: orderId, customerId: currentUser?.email || 'kiosk', customerName: currentUser?.name || 'Cliente Local', customerPhone: currentUser?.phone || '000',
-          customerAddress: deliveryType === 'PICKUP' ? 'RETIRADA' : (deliveryType === 'TABLE' ? `MESA ${tableNumber}` : (currentUser?.address || 'LOCAL')),
+          customerAddress: resolvedAddress,
           items: [...cart], total, deliveryFee: fee, deliveryType: (isKioskMode && deliveryType !== 'TABLE') ? 'PICKUP' : deliveryType, status: 'NOVO', paymentMethod: deliveryType === 'TABLE' ? 'PAGAMENTO NO BALCÃO' : paymentMethod, createdAt: new Date().toISOString(), pointsEarned: Math.floor(total), changeFor: changeFor || 0, discountValue: discount || 0, couponCode: couponCode || '', tableId: tableId || '', orderNumber: nextOrderNumber
         };
         
@@ -1383,6 +1412,7 @@ const App: React.FC = () => {
         defaultTableId={tableId}
         isAdmin={isAdminAuthenticated}
         forcedDeliveryType={forcedDeliveryType}
+        zipRanges={zipRanges}
       />
       <ProductModal product={selectedProduct} complements={complements} categories={categories} onClose={() => setSelectedProduct(null)} onAdd={handleAddToCart} isStoreOpen={isStoreOpen} logoUrl={logoUrl} />
       <AuthModal 

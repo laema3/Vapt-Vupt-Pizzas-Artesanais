@@ -36,7 +36,8 @@ export const PizzaPricingCalculator: React.FC = () => {
   const [newRecipeName, setNewRecipeName] = useState('');
   const [newRecipeMargin, setNewRecipeMargin] = useState('100'); // 100% margin standard
   const [newRecipeSalePrice, setNewRecipeSalePrice] = useState('');
-  const [lastModifiedField, setLastModifiedField] = useState<'margin' | 'price'>('margin');
+  const [newRecipeCmv, setNewRecipeCmv] = useState('50.0'); // 50% CMV standard for 100% margin
+  const [lastModifiedField, setLastModifiedField] = useState<'margin' | 'price' | 'cmv'>('margin');
   const [currentRecipeIngredients, setCurrentRecipeIngredients] = useState<PizzaRecipeIngredient[]>([]);
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [confirmDeleteRecipeId, setConfirmDeleteRecipeId] = useState<string | null>(null);
@@ -127,8 +128,11 @@ export const PizzaPricingCalculator: React.FC = () => {
     if (!isNaN(m) && cost > 0) {
       const calculatedPrice = cost * (1 + m / 100);
       setNewRecipeSalePrice(calculatedPrice.toFixed(2));
+      const calculatedCmv = calculatedPrice > 0 ? (cost / calculatedPrice) * 100 : 0;
+      setNewRecipeCmv(calculatedCmv.toFixed(1));
     } else if (marginStr === '') {
       setNewRecipeSalePrice('');
+      setNewRecipeCmv('');
     }
   };
 
@@ -140,7 +144,26 @@ export const PizzaPricingCalculator: React.FC = () => {
     if (!isNaN(price) && cost > 0) {
       const calculatedMargin = ((price - cost) / cost) * 100;
       setNewRecipeMargin(calculatedMargin.toFixed(1));
+      const calculatedCmv = price > 0 ? (cost / price) * 100 : 0;
+      setNewRecipeCmv(calculatedCmv.toFixed(1));
     } else if (priceStr === '') {
+      setNewRecipeMargin('');
+      setNewRecipeCmv('');
+    }
+  };
+
+  const handleCmvChange = (cmvStr: string, currentIngs = currentRecipeIngredients) => {
+    setNewRecipeCmv(cmvStr);
+    setLastModifiedField('cmv');
+    const cmv = parseFloat(cmvStr);
+    const cost = calculateRecipeCost(currentIngs);
+    if (!isNaN(cmv) && cmv > 0 && cost > 0) {
+      const calculatedPrice = cost / (cmv / 100);
+      setNewRecipeSalePrice(calculatedPrice.toFixed(2));
+      const calculatedMargin = ((calculatedPrice - cost) / cost) * 100;
+      setNewRecipeMargin(calculatedMargin.toFixed(1));
+    } else if (cmvStr === '') {
+      setNewRecipeSalePrice('');
       setNewRecipeMargin('');
     }
   };
@@ -153,12 +176,24 @@ export const PizzaPricingCalculator: React.FC = () => {
         if (!isNaN(price)) {
           const calculatedMargin = ((price - cost) / cost) * 100;
           setNewRecipeMargin(calculatedMargin.toFixed(1));
+          const calculatedCmv = price > 0 ? (cost / price) * 100 : 0;
+          setNewRecipeCmv(calculatedCmv.toFixed(1));
+        }
+      } else if (lastModifiedField === 'cmv' && newRecipeCmv !== '') {
+        const cmv = parseFloat(newRecipeCmv);
+        if (!isNaN(cmv) && cmv > 0) {
+          const calculatedPrice = cost / (cmv / 100);
+          setNewRecipeSalePrice(calculatedPrice.toFixed(2));
+          const calculatedMargin = ((calculatedPrice - cost) / cost) * 100;
+          setNewRecipeMargin(calculatedMargin.toFixed(1));
         }
       } else {
         const m = parseFloat(newRecipeMargin);
         if (!isNaN(m)) {
           const calculatedPrice = cost * (1 + m / 100);
           setNewRecipeSalePrice(calculatedPrice.toFixed(2));
+          const calculatedCmv = calculatedPrice > 0 ? (cost / calculatedPrice) * 100 : 0;
+          setNewRecipeCmv(calculatedCmv.toFixed(1));
         }
       }
     }
@@ -211,6 +246,7 @@ export const PizzaPricingCalculator: React.FC = () => {
     setNewRecipeName('');
     setNewRecipeMargin('100');
     setNewRecipeSalePrice('');
+    setNewRecipeCmv('50.0');
     setLastModifiedField('margin');
     setCurrentRecipeIngredients([]);
   };
@@ -218,9 +254,11 @@ export const PizzaPricingCalculator: React.FC = () => {
   const handleEditRecipe = (recipe: PizzaRecipe) => {
     const cost = calculateRecipeCost(recipe.ingredients);
     const price = cost * (1 + recipe.margin / 100);
+    const cmv = price > 0 ? (cost / price) * 100 : 0;
     setNewRecipeName(recipe.name);
     setNewRecipeMargin(recipe.margin.toString());
     setNewRecipeSalePrice(cost > 0 ? price.toFixed(2) : '');
+    setNewRecipeCmv(cost > 0 ? cmv.toFixed(1) : '');
     setLastModifiedField('margin');
     setCurrentRecipeIngredients([...recipe.ingredients]);
     setEditingRecipeId(recipe.id);
@@ -232,9 +270,23 @@ export const PizzaPricingCalculator: React.FC = () => {
     setNewRecipeName('');
     setNewRecipeMargin('100');
     setNewRecipeSalePrice('');
+    setNewRecipeCmv('50.0');
     setLastModifiedField('margin');
     setCurrentRecipeIngredients([]);
     setEditingRecipeId(null);
+  };
+
+  const getCmvBadge = (cmvVal: number) => {
+    if (isNaN(cmvVal) || cmvVal <= 0) return null;
+    if (cmvVal <= 30) {
+      return <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">CMV Ótimo ({cmvVal.toFixed(1)}%)</span>;
+    } else if (cmvVal <= 35) {
+      return <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">CMV Ideal ({cmvVal.toFixed(1)}%)</span>;
+    } else if (cmvVal <= 40) {
+      return <span className="bg-orange-100 text-orange-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">CMV Moderado ({cmvVal.toFixed(1)}%)</span>;
+    } else {
+      return <span className="bg-red-100 text-red-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">CMV Alto ({cmvVal.toFixed(1)}%)</span>;
+    }
   };
 
   const handleRemoveRecipe = async (id: string) => {
@@ -348,29 +400,55 @@ export const PizzaPricingCalculator: React.FC = () => {
               <label className={labelClass}>Nome da Pizza / Receita</label>
               <input type="text" value={newRecipeName} onChange={e => setNewRecipeName(e.target.value)} placeholder="Ex: Pizza Calabresa Grande" className={inputClass} />
             </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Valor Desejado de Venda (R$)</label>
-              <input 
-                type="number" 
-                step="0.01"
-                value={newRecipeSalePrice} 
-                onChange={e => handleSalePriceChange(e.target.value)} 
-                placeholder="Ex: 50.00" 
-                className={inputClass} 
-              />
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className={labelClass}>Valor Venda (R$)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={newRecipeSalePrice} 
+                  onChange={e => handleSalePriceChange(e.target.value)} 
+                  placeholder="Ex: 50.00" 
+                  className={inputClass} 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>CMV Desejado (%)</label>
+                <input 
+                  type="number" 
+                  step="0.1"
+                  value={newRecipeCmv} 
+                  onChange={e => handleCmvChange(e.target.value)} 
+                  placeholder="Ex: 30" 
+                  className={inputClass} 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Margem (%)</label>
+                <input 
+                  type="number" 
+                  value={newRecipeMargin} 
+                  onChange={e => handleMarginChange(e.target.value)} 
+                  placeholder="Ex: 100" 
+                  className={inputClass} 
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Margem de Lucro Desejada (%)</label>
-              <input 
-                type="number" 
-                value={newRecipeMargin} 
-                onChange={e => handleMarginChange(e.target.value)} 
-                placeholder="Ex: 100" 
-                className={inputClass} 
-              />
+
+            {/* Caixa Informativa sobre CMV */}
+            <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 text-xs space-y-1 text-slate-700">
+              <div className="flex items-center justify-between font-black text-amber-900 uppercase tracking-wide">
+                <span>💡 O que é CMV (Custo de Mercadoria Vendida)?</span>
+                {newRecipeCmv && getCmvBadge(parseFloat(newRecipeCmv))}
+              </div>
+              <p className="text-slate-600 leading-relaxed">
+                O CMV indica qual porcentagem do valor da venda é consumida pelos ingredientes. 
+                Nas pizzarias, o valor ideal de CMV varia entre <strong>25% e 35%</strong> para garantir boa lucratividade.
+              </p>
             </div>
             
-            <div className="space-y-2 pt-4">
+            <div className="space-y-2 pt-2">
               <label className={labelClass}>Adicionar Ingrediente na Receita</label>
               <div className="flex gap-2">
                 <select id="ing-select" className={inputClass} defaultValue="">
@@ -426,11 +504,19 @@ export const PizzaPricingCalculator: React.FC = () => {
             
             {currentRecipeIngredients.length > 0 && (
               <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
-                <div className="flex justify-between items-center text-sm font-bold text-slate-600">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
                   <span>Custo Total Ingredientes:</span>
                   <span className="text-red-600">R$ {calculateRecipeCost(currentRecipeIngredients).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between items-center text-lg font-black text-slate-800">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                  <span>CMV da Receita:</span>
+                  <span className="text-amber-600 font-black">{newRecipeCmv ? `${newRecipeCmv}%` : '-'}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                  <span>Margem sobre Custo:</span>
+                  <span className="text-blue-600 font-black">{newRecipeMargin ? `${newRecipeMargin}%` : '-'}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg font-black text-slate-800 pt-1 border-t border-slate-200/60">
                   <span>Preço Sugerido (Venda):</span>
                   <span className="text-emerald-600">
                     R$ {(calculateRecipeCost(currentRecipeIngredients) * (1 + parseFloat(newRecipeMargin || '0') / 100)).toFixed(2)}
@@ -451,6 +537,7 @@ export const PizzaPricingCalculator: React.FC = () => {
                {recipes.map(recipe => {
                  const cost = calculateRecipeCost(recipe.ingredients);
                  const price = cost * (1 + recipe.margin / 100);
+                 const cmvVal = price > 0 ? (cost / price) * 100 : 0;
                  return (
                    <div key={recipe.id} className={`bg-slate-50 border border-slate-200 p-6 rounded-3xl relative group ${editingRecipeId === recipe.id ? 'ring-2 ring-red-500' : ''}`}>
                      <div className="absolute top-4 right-4 flex gap-2 z-10">
@@ -465,7 +552,10 @@ export const PizzaPricingCalculator: React.FC = () => {
                          <button onClick={() => setConfirmDeleteRecipeId(recipe.id)} className="text-red-500 hover:text-red-700 font-bold text-xs bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 transition-colors">Excluir</button>
                        )}
                      </div>
-                     <h5 className="font-black text-slate-800 text-lg mb-4 pr-24">{recipe.name}</h5>
+                     <h5 className="font-black text-slate-800 text-lg mb-2 pr-24">{recipe.name}</h5>
+                     <div className="mb-4">
+                       {getCmvBadge(cmvVal)}
+                     </div>
                      <div className="space-y-1 mb-6">
                        {recipe.ingredients.map(ri => {
                          const ing = ingredients.find(i => i.id === ri.ingredientId);
@@ -479,15 +569,19 @@ export const PizzaPricingCalculator: React.FC = () => {
                      </div>
                      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2">
                         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
-                          <span>Custo</span>
+                          <span>Custo Ingredientes</span>
                           <span className="text-red-600">R$ {cost.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
-                          <span>Margem</span>
-                          <span className="text-amber-500">{recipe.margin}%</span>
+                          <span>CMV</span>
+                          <span className="text-amber-600 font-black">{cmvVal.toFixed(1)}%</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
+                          <span>Margem sobre Custo</span>
+                          <span className="text-blue-600">{recipe.margin}%</span>
                         </div>
                         <div className="flex justify-between text-sm font-black text-slate-800 uppercase tracking-widest pt-2 border-t border-slate-100">
-                          <span>Venda</span>
+                          <span>Preço Venda</span>
                           <span className="text-emerald-600">R$ {price.toFixed(2)}</span>
                         </div>
                      </div>

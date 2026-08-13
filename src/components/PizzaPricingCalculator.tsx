@@ -51,21 +51,22 @@ export const PizzaPricingCalculator: React.FC = () => {
   const [confirmDeleteRecipeId, setConfirmDeleteRecipeId] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const ings = await dbService.getAll<Ingredient>('ingredients');
-        const recs = await dbService.getAll<PizzaRecipe>('pizza_recipes');
-        const prods = await dbService.getAll<Product>('products');
-        setIngredients(ings);
-        setRecipes(recs);
-        setProducts(prods);
-      } catch (e) {
-        console.error("Error loading pricing data", e);
-      } finally {
-        setLoading(false);
-      }
+    const unsubIngs = dbService.subscribe<Ingredient[]>('ingredients', (data) => {
+      if (data) setIngredients(data);
+      setLoading(false);
+    });
+    const unsubRecs = dbService.subscribe<PizzaRecipe[]>('pizza_recipes', (data) => {
+      if (data) setRecipes(data);
+    });
+    const unsubProds = dbService.subscribe<Product[]>('products', (data) => {
+      if (data) setProducts(data);
+    });
+
+    return () => {
+      unsubIngs();
+      unsubRecs();
+      unsubProds();
     };
-    loadData();
   }, []);
 
   const handleSaveIngredient = async () => {

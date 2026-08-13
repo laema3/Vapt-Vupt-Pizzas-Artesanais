@@ -78,7 +78,9 @@ export const dbService = {
   save: async (collectionName: string, id: string, data: any) => {
     if (!db) throw new Error("Database not initialized");
     try {
-      await setDoc(doc(db, collectionName, id), data, { merge: true });
+      // JSON.parse(JSON.stringify) removes undefined fields that break Firestore setDoc
+      const cleanData = JSON.parse(JSON.stringify(data));
+      await setDoc(doc(db, collectionName, id), cleanData, { merge: true });
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, collectionName);
     }

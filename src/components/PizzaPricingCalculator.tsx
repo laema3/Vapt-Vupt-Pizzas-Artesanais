@@ -100,6 +100,9 @@ export const PizzaPricingCalculator: React.FC = () => {
     setNewIngCost(ing.cost.toString());
     setNewIngUnit(ing.unit);
     setEditingIngredientId(ing.id);
+    setTimeout(() => {
+      ingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
   
   const handleCancelEditIngredient = () => {
@@ -330,9 +333,10 @@ export const PizzaPricingCalculator: React.FC = () => {
   };
 
   const formRef = useRef<HTMLDivElement>(null);
+  const ingFormRef = useRef<HTMLDivElement>(null);
 
   const handleEditRecipe = (recipe: PizzaRecipe) => {
-    const cost = calculateRecipeCost(recipe.ingredients);
+    const cost = calculateRecipeCost(recipe.ingredients || []);
     const price = cost * (1 + recipe.margin / 100);
     const cmv = price > 0 ? (cost / price) * 100 : 0;
     setNewRecipeName(recipe.name);
@@ -341,12 +345,12 @@ export const PizzaPricingCalculator: React.FC = () => {
     setNewRecipeCmv(cost > 0 ? cmv.toFixed(1) : '');
     setSelectedProductId(recipe.productId || '');
     setLastModifiedField('margin');
-    setCurrentRecipeIngredients([...recipe.ingredients]);
+    setCurrentRecipeIngredients([...(recipe.ingredients || [])]);
     setEditingRecipeId(recipe.id);
     
     setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
   
   const handleCancelEditRecipe = () => {
@@ -390,7 +394,7 @@ export const PizzaPricingCalculator: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+      <div ref={ingFormRef} className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
         <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-3">
           <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-xl">🍅</span>
           Banco de Ingredientes
@@ -655,31 +659,37 @@ export const PizzaPricingCalculator: React.FC = () => {
               )}
             </div>
             
-            {currentRecipeIngredients.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
-                  <span>Custo Total Ingredientes:</span>
-                  <span className="text-red-600">R$ {calculateRecipeCost(currentRecipeIngredients).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
-                  <span>CMV da Receita:</span>
-                  <span className="text-amber-600 font-black">{newRecipeCmv ? `${newRecipeCmv}%` : '-'}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs font-bold text-slate-600">
-                  <span>Margem sobre Custo:</span>
-                  <span className="text-blue-600 font-black">{newRecipeMargin ? `${newRecipeMargin}%` : '-'}</span>
-                </div>
-                <div className="flex justify-between items-center text-lg font-black text-slate-800 pt-1 border-t border-slate-200/60">
-                  <span>Preço Sugerido (Venda):</span>
-                  <span className="text-emerald-600">
-                    R$ {(calculateRecipeCost(currentRecipeIngredients) * (1 + parseFloat(newRecipeMargin || '0') / 100)).toFixed(2)}
-                  </span>
-                </div>
-                <button onClick={handleSaveRecipe} className="w-full mt-4 bg-red-600 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-md">
-                  {editingRecipeId ? 'Salvar Alterações da Receita' : 'Salvar Receita'}
-                </button>
+            <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                <span>Custo Total Ingredientes:</span>
+                <span className="text-red-600">R$ {calculateRecipeCost(currentRecipeIngredients).toFixed(2)}</span>
               </div>
-            )}
+              <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                <span>CMV da Receita:</span>
+                <span className="text-amber-600 font-black">{newRecipeCmv ? `${newRecipeCmv}%` : '-'}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                <span>Margem sobre Custo:</span>
+                <span className="text-blue-600 font-black">{newRecipeMargin ? `${newRecipeMargin}%` : '-'}</span>
+              </div>
+              <div className="flex justify-between items-center text-lg font-black text-slate-800 pt-1 border-t border-slate-200/60">
+                <span>Preço Sugerido (Venda):</span>
+                <span className="text-emerald-600">
+                  R$ {(calculateRecipeCost(currentRecipeIngredients) * (1 + parseFloat(newRecipeMargin || '0') / 100)).toFixed(2)}
+                </span>
+              </div>
+              <button 
+                onClick={handleSaveRecipe} 
+                disabled={!newRecipeName.trim()}
+                className={`w-full mt-4 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-md ${
+                  newRecipeName.trim() 
+                    ? editingRecipeId ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                {editingRecipeId ? '💾 Salvar Alterações da Receita' : '🚀 Salvar Receita'}
+              </button>
+            </div>
           </div>
         </div>
 

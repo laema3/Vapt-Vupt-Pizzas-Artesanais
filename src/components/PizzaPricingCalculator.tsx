@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
 import { Product } from '../types';
 
@@ -329,6 +329,8 @@ export const PizzaPricingCalculator: React.FC = () => {
     }
   };
 
+  const formRef = useRef<HTMLDivElement>(null);
+
   const handleEditRecipe = (recipe: PizzaRecipe) => {
     const cost = calculateRecipeCost(recipe.ingredients);
     const price = cost * (1 + recipe.margin / 100);
@@ -342,7 +344,9 @@ export const PizzaPricingCalculator: React.FC = () => {
     setCurrentRecipeIngredients([...recipe.ingredients]);
     setEditingRecipeId(recipe.id);
     
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
   
   const handleCancelEditRecipe = () => {
@@ -461,7 +465,18 @@ export const PizzaPricingCalculator: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+      <div ref={formRef} className={`bg-white p-8 rounded-[40px] border shadow-sm space-y-6 transition-all ${editingRecipeId ? 'border-blue-500 ring-4 ring-blue-50' : 'border-slate-200'}`}>
+        {editingRecipeId && (
+          <div className="bg-blue-600 text-white px-6 py-4 rounded-2xl shadow-md font-black text-xs flex items-center justify-between uppercase tracking-wider">
+            <span className="flex items-center gap-2">
+              <span className="text-base">✏️</span> Editando Receita: <u className="underline-offset-4">{newRecipeName}</u>
+            </span>
+            <button onClick={handleCancelEditRecipe} className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all">
+              Cancelar Edição
+            </button>
+          </div>
+        )}
+
         {syncNotification && (
           <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-lg font-black text-sm flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300">
             <span>{syncNotification}</span>

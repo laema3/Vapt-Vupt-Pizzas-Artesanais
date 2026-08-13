@@ -1273,7 +1273,7 @@ const App: React.FC = () => {
         ) : (
           <div className="flex flex-col w-full items-center">
             {!isKioskMode && !forcedDeliveryType && activeView === 'home' && (
-              <section className="relative w-full flex items-center justify-center overflow-hidden py-16 sm:py-24">
+              <section className="relative w-full flex items-center justify-center overflow-hidden py-6 sm:py-8">
                 {/* Background Image with Overlay */}
                 <div 
                   className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -1282,14 +1282,14 @@ const App: React.FC = () => {
                 <div className="absolute inset-0 z-0 bg-black/60 backdrop-blur-[2px]"></div>
 
                 <div className="relative z-10 text-center px-4 flex flex-col items-center w-full max-w-4xl mx-auto">
-                    {!isStoreOpen && <div className="mb-8 mx-4 bg-red-600 text-white px-8 py-3 rounded-full font-black uppercase text-sm animate-pulse shadow-lg ring-4 ring-red-600/30">ESTAMOS FECHADOS NO MOMENTO</div>}
+                    {!isStoreOpen && <div className="mb-4 mx-4 bg-red-600 text-white px-6 py-2 rounded-full font-black uppercase text-xs sm:text-sm animate-pulse shadow-lg ring-4 ring-red-600/30">ESTAMOS FECHADOS NO MOMENTO</div>}
                     
                     {!logoUrl && (
-                      <div className="relative flex flex-col items-center p-1 sm:p-2 mb-6">
+                      <div className="relative flex flex-col items-center p-1 sm:p-2 mb-3">
                         <div className="relative z-10 flex flex-col items-center gap-0">
                           <>
                             <h1 
-                              className="font-black text-6xl sm:text-[110px] uppercase leading-[0.85] tracking-tighter text-white" 
+                              className="font-black text-5xl sm:text-[90px] uppercase leading-[0.85] tracking-tighter text-white" 
                               style={{ 
                                 filter: 'drop-shadow(4px 4px 0 rgba(0,0,0,0.8))'
                               }}
@@ -1297,7 +1297,7 @@ const App: React.FC = () => {
                               VAPT VUPT
                             </h1>
                             <h2 
-                              className="font-black text-2xl sm:text-4xl uppercase tracking-tighter mt-4" 
+                              className="font-black text-xl sm:text-3xl uppercase tracking-tighter mt-2" 
                               style={{ 
                                 color: '#FFDE21',
                                 filter: 'drop-shadow(2px 2px 0 rgba(0,0,0,0.8))'
@@ -1311,12 +1311,12 @@ const App: React.FC = () => {
                     )}
 
                     {logoUrl && (
-                      <div className="relative flex flex-col items-center p-1 mb-8 animate-in zoom-in duration-500">
+                      <div className="relative flex flex-col items-center p-1 mb-3 animate-in zoom-in duration-500">
                         <div className="absolute inset-0 bg-white/20 blur-xl rounded-full"></div>
                         <img 
                           src={logoUrl} 
                           alt="Logo VAPT VUPT" 
-                          className="relative w-36 h-36 sm:w-48 sm:h-48 object-contain border-4 border-white shadow-2xl rounded-full bg-white/10 backdrop-blur-sm p-2" 
+                          className="relative w-28 h-28 sm:w-36 sm:h-36 object-contain border-4 border-white shadow-2xl rounded-full bg-white/10 backdrop-blur-sm p-1.5" 
                           referrerPolicy="no-referrer"
                         />
                       </div>
@@ -1324,7 +1324,7 @@ const App: React.FC = () => {
 
                     <button 
                       onClick={() => document.getElementById('menu-anchor')?.scrollIntoView({behavior:'smooth'})} 
-                      className="mt-4 mb-4 mx-4 bg-red-600 text-white px-12 py-5 rounded-full font-black text-xl sm:text-2xl border-b-8 border-red-800 uppercase shadow-2xl active:translate-y-1 active:border-b-0 hover:bg-red-500 transition-all flex items-center gap-3 group"
+                      className="mt-2 mb-1 mx-4 bg-red-600 text-white px-8 py-3 sm:px-10 sm:py-3.5 rounded-full font-black text-lg sm:text-xl border-b-6 border-red-800 uppercase shadow-2xl active:translate-y-1 active:border-b-0 hover:bg-red-500 transition-all flex items-center gap-2 group"
                     >
                       <span>Ver Cardápio</span>
                       <span className="group-hover:translate-y-1 transition-transform">👇</span>

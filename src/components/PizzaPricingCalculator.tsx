@@ -247,16 +247,26 @@ export const PizzaPricingCalculator: React.FC = () => {
   };
 
   const findProductForRecipe = (recipeName: string, productId?: string, productList: Product[] = products): Product | undefined => {
+    // If productId provided, check if it's visible. If visible, return it.
+    let productById: Product | undefined;
     if (productId) {
-      const found = productList.find(p => p.id === productId);
-      if (found) return found;
+      productById = productList.find(p => p.id === productId);
+      if (productById && !productById.hidden) return productById;
     }
-    if (!recipeName || !recipeName.trim()) return undefined;
+
+    if (!recipeName || !recipeName.trim()) return productById;
 
     const normRecipe = normalizeStr(recipeName);
 
+    // Sort products so visible products (!p.hidden) are checked FIRST
+    const sortedProducts = [...productList].sort((a, b) => {
+      if (!a.hidden && b.hidden) return -1;
+      if (a.hidden && !b.hidden) return 1;
+      return 0;
+    });
+
     // 1. Exact match
-    const exact = productList.find(p => normalizeStr(p.name) === normRecipe);
+    const exact = sortedProducts.find(p => normalizeStr(p.name) === normRecipe);
     if (exact) return exact;
 
     // 2. Keyword match (ignoring filler words)
@@ -264,7 +274,7 @@ export const PizzaPricingCalculator: React.FC = () => {
     const recipeWords = cleanKeywords(normRecipe);
 
     if (recipeWords.length > 0) {
-      const matched = productList.find(p => {
+      const matched = sortedProducts.find(p => {
         const pWords = cleanKeywords(normalizeStr(p.name));
         if (pWords.length === 0) return false;
         const pInRecipe = pWords.every(w => normRecipe.includes(w));
@@ -275,12 +285,60 @@ export const PizzaPricingCalculator: React.FC = () => {
     }
 
     // 3. Substring match
-    const sub = productList.find(p => {
+    const sub = sortedProducts.find(p => {
       const pNorm = normalizeStr(p.name);
       return (pNorm.length > 3 && normRecipe.includes(pNorm)) || (normRecipe.length > 3 && pNorm.includes(normRecipe));
     });
+    if (sub) return sub;
 
-    return sub;
+    return productById;
+  };
+
+  const findAllProductsForRecipe = (recipeName: string, productId?: string, productList: Product[] = products): Product[] => {
+    const matchedSet = new Set<string>();
+    const results: Product[] = [];
+
+    // 1. Add by explicit ID if exists
+    if (productId) {
+      const p = productList.find(item => item.id === productId);
+      if (p) {
+        matchedSet.add(p.id);
+        results.push(p);
+      }
+    }
+
+    if (!recipeName || !recipeName.trim()) return results;
+
+    const normRecipe = normalizeStr(recipeName);
+    const cleanKeywords = (s: string) => s.split(' ').filter(w => !['pizza', 'pizzas', 'sabor', 'sabores', 'de', 'do', 'da', 'dos', 'das', 'com', 'ao', 'a', 'e', 'o', 'especial', 'tradicional', 'grande', 'broto', 'media'].includes(w) && w.length > 2);
+    const recipeWords = cleanKeywords(normRecipe);
+
+    productList.forEach(p => {
+      if (matchedSet.has(p.id)) return;
+      const pNorm = normalizeStr(p.name);
+
+      if (pNorm === normRecipe) {
+        matchedSet.add(p.id);
+        results.push(p);
+        return;
+      }
+
+      if (recipeWords.length > 0) {
+        const pWords = cleanKeywords(pNorm);
+        if (pWords.length > 0 && (pWords.every(w => normRecipe.includes(w)) || recipeWords.every(w => pNorm.includes(w)))) {
+          matchedSet.add(p.id);
+          results.push(p);
+          return;
+        }
+      }
+
+      if ((pNorm.length > 3 && normRecipe.includes(pNorm)) || (normRecipe.length > 3 && pNorm.includes(normRecipe))) {
+        matchedSet.add(p.id);
+        results.push(p);
+      }
+    });
+
+    return results;
   };
 
   const handleSaveRecipe = async () => {
@@ -290,21 +348,26 @@ export const PizzaPricingCalculator: React.FC = () => {
     const cost = calculateRecipeCost(currentRecipeIngredients);
     const calculatedPrice = parseFloat(newRecipeSalePrice) || (cost * (1 + marginToSave / 100));
 
-    // Find linked or matching product
-    let targetProduct = products.find(p => p.id === selectedProductId);
-    if (!targetProduct && newRecipeName.trim()) {
-      targetProduct = findProductForRecipe(newRecipeName, undefined, products);
-    }
+    // Find linked or matching products (prioritizing visible ones)
+    const matchingProducts = findAllProductsForRecipe(newRecipeName, selectedProductId, products);
+    const targetProduct = matchingProducts.find(p => !p.hidden) || matchingProducts[0];
 
     const linkedProductId = targetProduct?.id || selectedProductId || undefined;
 
-    // Sync product price in cardápio automatically if autoSyncMenu is enabled
-    if (autoSyncMenu && targetProduct && calculatedPrice > 0) {
-      const updatedProduct: Product = { ...targetProduct, price: Number(calculatedPrice.toFixed(2)) };
-      await dbService.save('products', targetProduct.id, updatedProduct);
-      setProducts(prev => prev.map(p => p.id === targetProduct!.id ? updatedProduct : p));
+    // Sync ALL matching product prices in cardápio automatically if autoSyncMenu is enabled
+    if (autoSyncMenu && calculatedPrice > 0 && matchingProducts.length > 0) {
+      const roundedPrice = Number(calculatedPrice.toFixed(2));
+      for (const prod of matchingProducts) {
+        const updatedProduct: Product = { ...prod, price: roundedPrice };
+        await dbService.save('products', prod.id, updatedProduct);
+      }
       
-      setSyncNotification(`⚡ Preço de "${targetProduct.name}" atualizado de R$ ${targetProduct.price.toFixed(2)} para R$ ${calculatedPrice.toFixed(2)} no cardápio!`);
+      setProducts(prev => prev.map(p => {
+        const isMatch = matchingProducts.some(m => m.id === p.id);
+        return isMatch ? { ...p, price: roundedPrice } : p;
+      }));
+      
+      setSyncNotification(`⚡ Preço de "${targetProduct?.name || newRecipeName}" (${matchingProducts.length} produto(s) no cardápio) atualizado para R$ ${calculatedPrice.toFixed(2)}!`);
       setTimeout(() => setSyncNotification(null), 5000);
     }
 
@@ -347,23 +410,31 @@ export const PizzaPricingCalculator: React.FC = () => {
     const cost = calculateRecipeCost(recipe.ingredients);
     const price = Number((cost * (1 + recipe.margin / 100)).toFixed(2));
     
-    // Find matched product
+    // Find all matched products (both visible and hidden)
     const prodIdToFind = explicitProductId || recipe.productId;
-    const prod = products.find(p => p.id === prodIdToFind) || findProductForRecipe(recipe.name, recipe.productId, products);
+    const matchingProds = findAllProductsForRecipe(recipe.name, prodIdToFind, products);
     
-    if (prod) {
-      const updatedProd = { ...prod, price };
-      await dbService.save('products', prod.id, updatedProd);
-      setProducts(prev => prev.map(p => p.id === prod.id ? updatedProd : p));
+    if (matchingProds.length > 0) {
+      // Update ALL matching products to guarantee visible store products are updated
+      for (const prod of matchingProds) {
+        const updatedProd = { ...prod, price };
+        await dbService.save('products', prod.id, updatedProd);
+      }
+
+      setProducts(prev => prev.map(p => {
+        const isMatch = matchingProds.some(m => m.id === p.id);
+        return isMatch ? { ...p, price } : p;
+      }));
       
-      // Also ensure recipe is permanently linked to this product ID
-      if (recipe.productId !== prod.id) {
-        const updatedRecipe = { ...recipe, productId: prod.id };
+      // Permanently link recipe to the visible (non-hidden) product
+      const visibleProd = matchingProds.find(p => !p.hidden) || matchingProds[0];
+      if (recipe.productId !== visibleProd.id) {
+        const updatedRecipe = { ...recipe, productId: visibleProd.id };
         await dbService.save('pizza_recipes', recipe.id, updatedRecipe);
         setRecipes(prev => prev.map(r => r.id === recipe.id ? updatedRecipe : r));
       }
       
-      setSyncNotification(`⚡ Preço de "${prod.name}" sincronizado no cardápio de R$ ${prod.price.toFixed(2)} para R$ ${price.toFixed(2)}!`);
+      setSyncNotification(`⚡ Preço de "${visibleProd.name}" atualizado para R$ ${price.toFixed(2)} no cardápio! (${matchingProds.length} produto(s) atualizados)`);
       setTimeout(() => setSyncNotification(null), 5000);
     } else {
       // Create new product directly in cardápio
@@ -375,7 +446,8 @@ export const PizzaPricingCalculator: React.FC = () => {
         price,
         category: 'Pizzas',
         image: '',
-        rating: 5.0
+        rating: 5.0,
+        hidden: false
       };
       await dbService.save('products', newProdId, newProd);
       setProducts(prev => [...prev, newProd]);
@@ -403,15 +475,20 @@ export const PizzaPricingCalculator: React.FC = () => {
 
   const handleSyncAllRecipes = async () => {
     let syncedCount = 0;
+    const currentProds = await dbService.getAll<Product>('products');
+    
     for (const recipe of recipes) {
       const cost = calculateRecipeCost(recipe.ingredients);
       const price = Number((cost * (1 + recipe.margin / 100)).toFixed(2));
-      const prod = products.find(p => p.id === recipe.productId) || findProductForRecipe(recipe.name, recipe.productId, products);
-      if (prod && price > 0) {
-        const updatedProd = { ...prod, price };
-        await dbService.save('products', prod.id, updatedProd);
-        if (recipe.productId !== prod.id) {
-          await dbService.save('pizza_recipes', recipe.id, { ...recipe, productId: prod.id });
+      const matching = findAllProductsForRecipe(recipe.name, recipe.productId, currentProds);
+      
+      if (matching.length > 0 && price > 0) {
+        for (const prod of matching) {
+          await dbService.save('products', prod.id, { ...prod, price });
+        }
+        const visibleProd = matching.find(p => !p.hidden) || matching[0];
+        if (recipe.productId !== visibleProd.id) {
+          await dbService.save('pizza_recipes', recipe.id, { ...recipe, productId: visibleProd.id });
         }
         syncedCount++;
       }
@@ -420,7 +497,7 @@ export const PizzaPricingCalculator: React.FC = () => {
     setProducts(updatedProds);
     const updatedRecs = await dbService.getAll<PizzaRecipe>('pizza_recipes');
     setRecipes(updatedRecs);
-    setSyncNotification(`⚡ ${syncedCount} produtos sincronizados com sucesso no cardápio!`);
+    setSyncNotification(`⚡ ${syncedCount} receitas sincronizadas com sucesso em todos os produtos do cardápio!`);
     setTimeout(() => setSyncNotification(null), 5000);
   };
 
@@ -629,12 +706,18 @@ export const PizzaPricingCalculator: React.FC = () => {
                 }} 
                 className={inputClass}
               >
-                <option value="">-- Auto-buscar por nome ou selecione um produto --</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} (Atual no Cardápio: R$ {p.price.toFixed(2)})
-                  </option>
-                ))}
+                <option value="">-- Auto-buscar produto habilitado na loja --</option>
+                {[...products]
+                  .sort((a, b) => {
+                    if (!a.hidden && b.hidden) return -1;
+                    if (a.hidden && !b.hidden) return 1;
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.hidden ? '🙈 [Oculto] ' : '👁️ [Na Loja] '} {p.name} (R$ {p.price.toFixed(2)})
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -806,7 +889,8 @@ export const PizzaPricingCalculator: React.FC = () => {
                  const cost = calculateRecipeCost(recipe.ingredients);
                  const price = Number((cost * (1 + recipe.margin / 100)).toFixed(2));
                  const cmvVal = price > 0 ? (cost / price) * 100 : 0;
-                 const matchedProd = products.find(p => p.id === recipe.productId) || findProductForRecipe(recipe.name, recipe.productId, products);
+                 const matchingProds = findAllProductsForRecipe(recipe.name, recipe.productId, products);
+                 const matchedProd = matchingProds.find(p => !p.hidden) || matchingProds[0] || products.find(p => p.id === recipe.productId) || findProductForRecipe(recipe.name, recipe.productId, products);
                  const isSynced = matchedProd && Math.abs(matchedProd.price - price) < 0.01;
 
                  return (
@@ -859,79 +943,107 @@ export const PizzaPricingCalculator: React.FC = () => {
                        </div>
                      </div>
 
-                     {/* Status no Cardápio & Sincronização */}
-                     <div className="mt-4 pt-3 border-t border-slate-200/80 space-y-2">
-                       {matchedProd ? (
-                         <div className="flex flex-col gap-2">
-                           <div className="flex justify-between items-center text-xs bg-white p-2 rounded-xl border border-slate-100">
-                             <div className="truncate mr-2">
-                               <span className="text-[10px] text-slate-400 font-bold block uppercase">Produto Vinculado:</span>
-                               <span className="font-black text-slate-700 truncate block text-xs" title={matchedProd.name}>
-                                 {matchedProd.name}
-                               </span>
-                               <span className="text-xs font-bold text-slate-500">
-                                 Atual: <strong className={matchedProd.price === 0 ? 'text-red-500 underline' : 'text-slate-800'}>R$ {matchedProd.price.toFixed(2)}</strong>
-                               </span>
-                             </div>
-                             {isSynced ? (
-                               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase whitespace-nowrap">
-                                 ✓ Sincronizado
-                               </span>
-                             ) : (
-                               <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase whitespace-nowrap animate-pulse">
-                                 Divergente
-                               </span>
-                             )}
-                           </div>
-                           
-                           {!isSynced && (
-                             <button 
-                               onClick={() => syncPriceToProductDirectly(recipe, matchedProd.id)}
-                               className="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-black text-[11px] py-2.5 rounded-xl uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-1.5"
-                             >
-                               <span>⚡ Sincronizar "{matchedProd.name}" para R$ {price.toFixed(2)}</span>
-                             </button>
-                           )}
+                      {/* Status no Cardápio & Sincronização */}
+                      <div className="mt-4 pt-3 border-t border-slate-200/80 space-y-2">
+                        {matchedProd ? (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-slate-100">
+                              <div className="truncate mr-2 flex-1">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase">Produto:</span>
+                                  {matchedProd.hidden ? (
+                                    <span className="text-[9px] font-black bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">🙈 Oculto</span>
+                                  ) : (
+                                    <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">👁️ Habilitado na Loja</span>
+                                  )}
+                                </div>
+                                <span className="font-black text-slate-800 truncate block text-xs" title={matchedProd.name}>
+                                  {matchedProd.name}
+                                </span>
+                                <span className="text-xs font-bold text-slate-500">
+                                  Atual no Cardápio: <strong className={matchedProd.price === 0 ? 'text-red-500 underline' : 'text-slate-800'}>R$ {matchedProd.price.toFixed(2)}</strong>
+                                </span>
+                                {matchingProds.length > 1 && (
+                                  <span className="text-[10px] text-amber-600 font-bold block mt-0.5">
+                                    ℹ️ {matchingProds.length} cadastros vinculados (ambos serão sincronizados)
+                                  </span>
+                                )}
+                              </div>
+                              {isSynced ? (
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase whitespace-nowrap">
+                                  ✓ Sincronizado
+                                </span>
+                              ) : (
+                                <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase whitespace-nowrap animate-pulse">
+                                  Divergente
+                                </span>
+                              )}
+                            </div>
+                            
+                            {!isSynced && (
+                              <button 
+                                onClick={() => syncPriceToProductDirectly(recipe, matchedProd.id)}
+                                className="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-black text-[11px] py-2.5 rounded-xl uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-1.5"
+                              >
+                                <span>⚡ Sincronizar "{matchedProd.name}" para R$ {price.toFixed(2)}</span>
+                              </button>
+                            )}
 
-                           <div className="flex items-center gap-1 text-[10px] text-slate-400 justify-end">
-                             <span>Vínculo:</span>
-                             <select 
-                               value={recipe.productId || matchedProd.id}
-                               onChange={(e) => handleLinkProductToRecipe(recipe, e.target.value)}
-                               className="bg-transparent border-0 text-blue-600 font-bold text-[10px] p-0 underline cursor-pointer focus:ring-0"
-                             >
-                               {products.map(p => (
-                                 <option key={p.id} value={p.id}>{p.name} (R$ {p.price.toFixed(2)})</option>
-                               ))}
-                             </select>
-                           </div>
-                         </div>
-                       ) : (
-                         <div className="space-y-2">
-                           <div className="text-xs bg-slate-100 p-2.5 rounded-xl border border-slate-200 text-slate-600 flex flex-col gap-1.5">
-                             <span className="text-[10px] font-bold text-slate-400 uppercase">Nenhum produto correspondente:</span>
-                             <select 
-                               value=""
-                               onChange={(e) => {
-                                 if (e.target.value) handleLinkProductToRecipe(recipe, e.target.value);
-                               }}
-                               className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg p-1.5 text-slate-700"
-                             >
-                               <option value="">🔗 Selecionar produto existente para vincular...</option>
-                               {products.map(p => (
-                                 <option key={p.id} value={p.id}>{p.name} (R$ {p.price.toFixed(2)})</option>
-                               ))}
-                             </select>
-                           </div>
-                           <button 
-                             onClick={() => syncPriceToProductDirectly(recipe)}
-                             className="w-full bg-slate-800 hover:bg-black text-white font-black text-[11px] py-2 rounded-xl uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5"
-                           >
-                             <span>➕ Criar Novo Produto no Cardápio (R$ {price.toFixed(2)})</span>
-                           </button>
-                         </div>
-                       )}
-                     </div>
+                            <div className="flex items-center gap-1 text-[10px] text-slate-400 justify-end">
+                              <span>Vínculo:</span>
+                              <select 
+                                value={recipe.productId || matchedProd.id}
+                                onChange={(e) => handleLinkProductToRecipe(recipe, e.target.value)}
+                                className="bg-transparent border-0 text-blue-600 font-bold text-[10px] p-0 underline cursor-pointer focus:ring-0 max-w-[200px] truncate"
+                              >
+                                {[...products]
+                                  .sort((a, b) => {
+                                    if (!a.hidden && b.hidden) return -1;
+                                    if (a.hidden && !b.hidden) return 1;
+                                    return a.name.localeCompare(b.name);
+                                  })
+                                  .map(p => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.hidden ? '🙈 [Oculto] ' : '👁️ [Na Loja] '} {p.name} (R$ {p.price.toFixed(2)})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="text-xs bg-slate-100 p-2.5 rounded-xl border border-slate-200 text-slate-600 flex flex-col gap-1.5">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">Nenhum produto correspondente:</span>
+                              <select 
+                                value=""
+                                onChange={(e) => {
+                                  if (e.target.value) handleLinkProductToRecipe(recipe, e.target.value);
+                                }}
+                                className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg p-1.5 text-slate-700"
+                              >
+                                <option value="">🔗 Selecionar produto existente para vincular...</option>
+                                {[...products]
+                                  .sort((a, b) => {
+                                    if (!a.hidden && b.hidden) return -1;
+                                    if (a.hidden && !b.hidden) return 1;
+                                    return a.name.localeCompare(b.name);
+                                  })
+                                  .map(p => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.hidden ? '🙈 [Oculto] ' : '👁️ [Na Loja] '} {p.name} (R$ {p.price.toFixed(2)})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <button 
+                              onClick={() => syncPriceToProductDirectly(recipe)}
+                              className="w-full bg-slate-800 hover:bg-black text-white font-black text-[11px] py-2 rounded-xl uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5"
+                            >
+                              <span>➕ Criar Novo Produto no Cardápio (R$ {price.toFixed(2)})</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                    </div>
                  );
                })}

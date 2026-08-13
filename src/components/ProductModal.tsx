@@ -38,11 +38,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, complements
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-        <div className="relative h-64 sm:h-80 bg-white shrink-0 p-4 flex items-center justify-center border-b border-slate-100">
+        <div className="relative h-64 sm:h-80 bg-slate-50 shrink-0 p-4 flex items-center justify-center border-b border-slate-100">
           {product.image ? (
-            <img src={product.image} alt={product.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+            <img src={product.image} alt={product.name} className="w-full h-full object-contain rounded-2xl" referrerPolicy="no-referrer" />
           ) : (
-            <img src={logoUrl} alt="Logo" className="w-full h-full object-contain opacity-50" referrerPolicy="no-referrer" />
+            <img src={logoUrl} alt="Logo" className="w-full h-full object-contain rounded-2xl opacity-50" referrerPolicy="no-referrer" />
           )}
           <button onClick={onClose} className="absolute top-6 right-6 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg text-slate-800 hover:bg-red-50 hover:text-red-500 transition-colors font-black text-lg">✕</button>
         </div>

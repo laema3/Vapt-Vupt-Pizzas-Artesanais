@@ -14,15 +14,15 @@ export const FoodCard: React.FC<FoodCardProps> = ({ product, onAdd, onClick, log
     <div className="group relative bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all border border-slate-100 cursor-pointer flex flex-row md:flex-col gap-4 h-full" onClick={() => onClick(product)}>
       
       {/* Imagem (Direita no Mobile, Topo no Desktop) */}
-      <div className="relative w-24 h-24 sm:w-32 sm:h-32 md:w-full md:h-40 rounded-xl overflow-hidden shrink-0 bg-white order-2 md:order-1 shadow-inner p-2 flex items-center justify-center">
+      <div className="relative w-24 h-24 sm:w-32 sm:h-32 md:w-full md:h-40 rounded-2xl overflow-hidden shrink-0 bg-slate-50 order-2 md:order-1 p-1.5 flex items-center justify-center border border-slate-100">
         {product.image ? (
-          <img src={product.image} alt={product.name} className={`w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 ${product.outOfStock ? 'opacity-40 grayscale' : ''}`} loading="lazy" referrerPolicy="no-referrer" />
+          <img src={product.image} alt={product.name} className={`w-full h-full object-contain rounded-xl group-hover:scale-110 transition-transform duration-500 ${product.outOfStock ? 'opacity-40 grayscale' : ''}`} loading="lazy" referrerPolicy="no-referrer" />
         ) : (
-          <img src={logoUrl} alt="Logo" className="w-full h-full object-contain opacity-50" referrerPolicy="no-referrer" />
+          <img src={logoUrl} alt="Logo" className="w-full h-full object-contain rounded-xl opacity-50" referrerPolicy="no-referrer" />
         )}
         {product.outOfStock && (
-          <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center rounded-xl">
-            <span className="bg-red-650 bg-red-650 bg-red-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded shadow-md z-10 animate-pulse">Esgotado</span>
+          <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center rounded-2xl">
+            <span className="bg-red-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded shadow-md z-10 animate-pulse">Esgotado</span>
           </div>
         )}
       </div>

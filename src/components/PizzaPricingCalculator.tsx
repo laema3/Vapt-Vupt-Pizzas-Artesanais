@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
+import { Product } from '../types';
 
 interface Ingredient {
   id: string;
@@ -18,12 +19,19 @@ interface PizzaRecipe {
   name: string;
   ingredients: PizzaRecipeIngredient[];
   margin: number;
+  productId?: string;
 }
 
 export const PizzaPricingCalculator: React.FC = () => {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [recipes, setRecipes] = useState<PizzaRecipe[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Sync state
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [autoSyncMenu, setAutoSyncMenu] = useState<boolean>(true);
+  const [syncNotification, setSyncNotification] = useState<string | null>(null);
 
   // New Ingredient State
   const [newIngName, setNewIngName] = useState('');
@@ -47,8 +55,10 @@ export const PizzaPricingCalculator: React.FC = () => {
       try {
         const ings = await dbService.getAll<Ingredient>('ingredients');
         const recs = await dbService.getAll<PizzaRecipe>('pizza_recipes');
+        const prods = await dbService.getAll<Product>('products');
         setIngredients(ings);
         setRecipes(recs);
+        setProducts(prods);
       } catch (e) {
         console.error("Error loading pricing data", e);
       } finally {
@@ -113,8 +123,8 @@ export const PizzaPricingCalculator: React.FC = () => {
       const ing = ingredients.find(i => i.id === ri.ingredientId);
       if (!ing) return total;
       
-      let costPerUnit = ing.cost;
-      let qty = ri.quantity;
+      const costPerUnit = ing.cost;
+      const qty = ri.quantity;
 
       return total + (costPerUnit * qty);
     }, 0);
@@ -223,11 +233,37 @@ export const PizzaPricingCalculator: React.FC = () => {
     if (!newRecipeName) return;
     
     const marginToSave = parseFloat(newRecipeMargin) || 0;
+    const cost = calculateRecipeCost(currentRecipeIngredients);
+    const calculatedPrice = parseFloat(newRecipeSalePrice) || (cost * (1 + marginToSave / 100));
+
+    // Find linked or matching product
+    let targetProduct = products.find(p => p.id === selectedProductId);
+    if (!targetProduct && newRecipeName.trim()) {
+      targetProduct = products.find(p => p.name.toLowerCase().trim() === newRecipeName.toLowerCase().trim());
+    }
+
+    const linkedProductId = targetProduct?.id || selectedProductId;
+
+    // Sync product price in cardápio automatically if autoSyncMenu is enabled
+    if (autoSyncMenu && targetProduct && calculatedPrice > 0) {
+      const updatedProduct = { ...targetProduct, price: Number(calculatedPrice.toFixed(2)) };
+      await dbService.save('products', targetProduct.id, updatedProduct);
+      setProducts(prev => prev.map(p => p.id === targetProduct.id ? updatedProduct : p));
+      
+      setSyncNotification(`⚡ Preço de "${targetProduct.name}" atualizado para R$ ${calculatedPrice.toFixed(2)} no cardápio!`);
+      setTimeout(() => setSyncNotification(null), 5000);
+    }
 
     if (editingRecipeId) {
       const recipe = recipes.find(r => r.id === editingRecipeId);
       if (recipe) {
-        const updatedRecipe = { ...recipe, name: newRecipeName, ingredients: currentRecipeIngredients, margin: marginToSave };
+        const updatedRecipe: PizzaRecipe = { 
+          ...recipe, 
+          name: newRecipeName, 
+          ingredients: currentRecipeIngredients, 
+          margin: marginToSave,
+          productId: linkedProductId || undefined
+        };
         await dbService.save('pizza_recipes', recipe.id, updatedRecipe);
         setRecipes(recipes.map(r => r.id === recipe.id ? updatedRecipe : r));
         setEditingRecipeId(null);
@@ -237,7 +273,8 @@ export const PizzaPricingCalculator: React.FC = () => {
         id: Math.random().toString(36).substring(7),
         name: newRecipeName,
         ingredients: currentRecipeIngredients,
-        margin: marginToSave
+        margin: marginToSave,
+        productId: linkedProductId || undefined
       };
       await dbService.save('pizza_recipes', recipe.id, recipe);
       setRecipes([...recipes, recipe]);
@@ -247,8 +284,48 @@ export const PizzaPricingCalculator: React.FC = () => {
     setNewRecipeMargin('100');
     setNewRecipeSalePrice('');
     setNewRecipeCmv('50.0');
+    setSelectedProductId('');
     setLastModifiedField('margin');
     setCurrentRecipeIngredients([]);
+  };
+
+  const syncPriceToProductDirectly = async (recipe: PizzaRecipe) => {
+    const cost = calculateRecipeCost(recipe.ingredients);
+    const price = cost * (1 + recipe.margin / 100);
+    
+    // Find matched product
+    const prod = products.find(p => p.id === recipe.productId) || 
+                 products.find(p => p.name.toLowerCase().trim() === recipe.name.toLowerCase().trim());
+    
+    if (prod) {
+      const updatedProd = { ...prod, price: Number(price.toFixed(2)) };
+      await dbService.save('products', prod.id, updatedProd);
+      setProducts(prev => prev.map(p => p.id === prod.id ? updatedProd : p));
+      
+      setSyncNotification(`⚡ Preço de "${prod.name}" sincronizado no cardápio para R$ ${price.toFixed(2)}!`);
+      setTimeout(() => setSyncNotification(null), 5000);
+    } else {
+      // Create new product directly in cardápio
+      const newProdId = Math.random().toString(36).substring(7);
+      const newProd: Product = {
+        id: newProdId,
+        name: recipe.name,
+        description: 'Pizza artesanal com ingredientes selecionados.',
+        price: Number(price.toFixed(2)),
+        category: 'Pizzas',
+        image: '',
+        rating: 5.0
+      };
+      await dbService.save('products', newProdId, newProd);
+      setProducts(prev => [...prev, newProd]);
+      
+      const updatedRecipe = { ...recipe, productId: newProdId };
+      await dbService.save('pizza_recipes', recipe.id, updatedRecipe);
+      setRecipes(prev => prev.map(r => r.id === recipe.id ? updatedRecipe : r));
+      
+      setSyncNotification(`✨ Produto "${recipe.name}" criado no cardápio por R$ ${price.toFixed(2)}!`);
+      setTimeout(() => setSyncNotification(null), 5000);
+    }
   };
 
   const handleEditRecipe = (recipe: PizzaRecipe) => {
@@ -259,6 +336,7 @@ export const PizzaPricingCalculator: React.FC = () => {
     setNewRecipeMargin(recipe.margin.toString());
     setNewRecipeSalePrice(cost > 0 ? price.toFixed(2) : '');
     setNewRecipeCmv(cost > 0 ? cmv.toFixed(1) : '');
+    setSelectedProductId(recipe.productId || '');
     setLastModifiedField('margin');
     setCurrentRecipeIngredients([...recipe.ingredients]);
     setEditingRecipeId(recipe.id);
@@ -271,6 +349,7 @@ export const PizzaPricingCalculator: React.FC = () => {
     setNewRecipeMargin('100');
     setNewRecipeSalePrice('');
     setNewRecipeCmv('50.0');
+    setSelectedProductId('');
     setLastModifiedField('margin');
     setCurrentRecipeIngredients([]);
     setEditingRecipeId(null);
@@ -381,8 +460,15 @@ export const PizzaPricingCalculator: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
-        <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center justify-between">
+      <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+        {syncNotification && (
+          <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-lg font-black text-sm flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300">
+            <span>{syncNotification}</span>
+            <button onClick={() => setSyncNotification(null)} className="text-white hover:opacity-80 font-bold ml-4">✕</button>
+          </div>
+        )}
+
+        <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 bg-red-600 text-white rounded-xl flex items-center justify-center text-xl">🍕</span>
             Calculadora de Precificação
@@ -398,7 +484,58 @@ export const PizzaPricingCalculator: React.FC = () => {
           <div className="space-y-4">
             <div className="space-y-1">
               <label className={labelClass}>Nome da Pizza / Receita</label>
-              <input type="text" value={newRecipeName} onChange={e => setNewRecipeName(e.target.value)} placeholder="Ex: Pizza Calabresa Grande" className={inputClass} />
+              <input 
+                type="text" 
+                value={newRecipeName} 
+                onChange={e => {
+                  const val = e.target.value;
+                  setNewRecipeName(val);
+                  const matched = products.find(p => p.name.toLowerCase().trim() === val.toLowerCase().trim());
+                  if (matched) {
+                    setSelectedProductId(matched.id);
+                  }
+                }} 
+                placeholder="Ex: Pizza Calabresa Grande" 
+                className={inputClass} 
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelClass}>Vincular ao Produto do Cardápio (Opcional)</label>
+              <select 
+                value={selectedProductId} 
+                onChange={e => {
+                  const val = e.target.value;
+                  setSelectedProductId(val);
+                  if (val) {
+                    const p = products.find(prod => prod.id === val);
+                    if (p && !newRecipeName) {
+                      setNewRecipeName(p.name);
+                    }
+                  }
+                }} 
+                className={inputClass}
+              >
+                <option value="">-- Auto-buscar por nome ou selecione um produto --</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} (Atual no Cardápio: R$ {p.price.toFixed(2)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1 pb-2">
+              <input 
+                type="checkbox" 
+                id="autoSyncMenu" 
+                checked={autoSyncMenu} 
+                onChange={e => setAutoSyncMenu(e.target.checked)} 
+                className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500 cursor-pointer" 
+              />
+              <label htmlFor="autoSyncMenu" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                ⚡ Atualizar preço no cardápio automaticamente ao salvar
+              </label>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -581,10 +718,54 @@ export const PizzaPricingCalculator: React.FC = () => {
                           <span className="text-blue-600">{recipe.margin}%</span>
                         </div>
                         <div className="flex justify-between text-sm font-black text-slate-800 uppercase tracking-widest pt-2 border-t border-slate-100">
-                          <span>Preço Venda</span>
+                          <span>Preço Venda (Calculadora)</span>
                           <span className="text-emerald-600">R$ {price.toFixed(2)}</span>
                         </div>
                      </div>
+
+                     {/* Status no Cardápio & Sincronização */}
+                     {(() => {
+                       const matchedProd = products.find(p => p.id === recipe.productId || p.name.toLowerCase().trim() === recipe.name.toLowerCase().trim());
+                       const isSynced = matchedProd && Math.abs(matchedProd.price - price) < 0.01;
+
+                       return (
+                         <div className="mt-3 pt-3 border-t border-slate-200/80">
+                           {matchedProd ? (
+                             <div className="flex flex-col gap-2">
+                               <div className="flex justify-between items-center text-xs">
+                                 <span className="font-bold text-slate-600 truncate max-w-[170px]" title={matchedProd.name}>
+                                   🛍️ Cardápio: <strong>R$ {matchedProd.price.toFixed(2)}</strong>
+                                 </span>
+                                 {isSynced ? (
+                                   <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                                     ✓ Sincronizado
+                                   </span>
+                                 ) : (
+                                   <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                                     Divergente
+                                   </span>
+                                 )}
+                               </div>
+                               {!isSynced && (
+                                 <button 
+                                   onClick={() => syncPriceToProductDirectly(recipe)}
+                                   className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black text-[11px] py-2 rounded-xl uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5"
+                                 >
+                                   <span>⚡ Atualizar no Cardápio para R$ {price.toFixed(2)}</span>
+                                 </button>
+                               )}
+                             </div>
+                           ) : (
+                             <button 
+                               onClick={() => syncPriceToProductDirectly(recipe)}
+                               className="w-full bg-slate-800 hover:bg-black text-white font-black text-[11px] py-2 rounded-xl uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5"
+                             >
+                               <span>➕ Criar no Cardápio (R$ {price.toFixed(2)})</span>
+                             </button>
+                           )}
+                         </div>
+                       );
+                     })()}
                    </div>
                  );
                })}

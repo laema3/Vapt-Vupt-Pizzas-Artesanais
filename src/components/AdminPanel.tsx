@@ -5,6 +5,7 @@ import { compressImage } from '../services/imageService.ts';
 import { dbService } from '../services/dbService.ts';
 import { writeBatch, doc } from 'firebase/firestore';
 import { PizzaPricingCalculator } from "./PizzaPricingCalculator.tsx";
+import { Eye, EyeOff } from 'lucide-react';
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 const APP_VERSION = "v6.0 (Subcategorias & Import SQL)";
@@ -805,6 +806,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                           {newProduct.image && <img src={newProduct.image} className="w-24 h-24 rounded-xl object-cover border-2 border-white shadow-md" referrerPolicy="no-referrer" />}
                         </div>
                      </div>
+                     <div className="md:col-span-2 lg:col-span-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setNewProduct({ ...newProduct, hidden: !newProduct.hidden })}
+                          className={`px-4 py-3 rounded-xl flex items-center gap-2 font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
+                            newProduct.hidden 
+                              ? 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300' 
+                              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          }`}
+                        >
+                          {newProduct.hidden ? <EyeOff className="w-5 h-5 text-red-500" /> : <Eye className="w-5 h-5 text-white" />}
+                          <span>{newProduct.hidden ? '🙈 Oculto na Loja' : '👁️ Habilitado na Loja'}</span>
+                        </button>
+                        <span className="text-xs text-slate-500 font-semibold">
+                          {newProduct.hidden ? 'Este produto NÃO aparecerá no cardápio dos clientes.' : 'Este produto ficará VISÍVEL no cardápio para os clientes comprarem.'}
+                        </span>
+                     </div>
                    </div>
                    <div className="flex justify-end pt-6 border-t border-slate-100">
                      <button onClick={handleSaveProduct} className={`px-10 py-5 rounded-xl text-sm font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 ${editingId ? 'bg-blue-600 text-white shadow-blue-200' : 'bg-red-600 text-white shadow-red-200'}`}>{editingId ? '💾 Atualizar Produto' : '🚀 Adicionar Produto'}</button>
@@ -812,26 +830,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {[...products].sort((a,b) => a.name.localeCompare(b.name)).map(p => (
-                     <div key={p.id} className={`bg-white p-5 rounded-3xl border flex gap-5 transition-all ${editingId === p.id ? 'border-blue-500 ring-4 ring-blue-50 shadow-xl' : 'border-slate-200 shadow-sm hover:shadow-lg'}`}>
-                        <div className="w-24 h-24 bg-slate-50 rounded-2xl overflow-hidden shrink-0 border border-slate-100"><img src={p.image || logoUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /></div>
+                     <div key={p.id} className={`bg-white p-5 rounded-3xl border flex gap-5 transition-all ${p.hidden ? 'opacity-75 bg-slate-50/80' : ''} ${editingId === p.id ? 'border-blue-500 ring-4 ring-blue-50 shadow-xl' : 'border-slate-200 shadow-sm hover:shadow-lg'}`}>
+                        <div className="w-24 h-24 bg-slate-50 rounded-2xl overflow-hidden shrink-0 border border-slate-100 relative">
+                          <img src={p.image || logoUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          {p.hidden && (
+                            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex flex-col items-center justify-center text-white p-1 text-center">
+                              <EyeOff className="w-5 h-5 text-red-400 mb-0.5" />
+                              <span className="text-[9px] font-black uppercase">Oculto</span>
+                            </div>
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
                            <div>
-                             <h4 className="font-black text-slate-800 truncate text-base">{p.name}</h4>
+                             <div className="flex justify-between items-start gap-2">
+                               <h4 className="font-black text-slate-800 truncate text-base">{p.name}</h4>
+                               {/* ÍCONE DO OLHO PARA HABILITAR/OCULTAR NA LOJA */}
+                               <button
+                                 onClick={async () => {
+                                   await onUpdateProduct({ ...p, hidden: !p.hidden });
+                                 }}
+                                 title={p.hidden ? "Oculto na loja. Clique para HABILITAR venda" : "Visível na loja. Clique para OCULTAR/DESABILITAR"}
+                                 className={`p-2 rounded-xl transition-all border shrink-0 flex items-center justify-center ${
+                                   p.hidden 
+                                     ? 'bg-slate-100 text-slate-400 border-slate-300 hover:bg-slate-200 hover:text-slate-700' 
+                                     : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                 }`}
+                               >
+                                 {p.hidden ? <EyeOff className="w-5 h-5 text-red-500" /> : <Eye className="w-5 h-5 text-emerald-600" />}
+                               </button>
+                             </div>
                              <p className="text-red-600 text-sm font-black mt-1">R$ {p.price.toFixed(2)}</p>
-                              {p.outOfStock ? <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full block w-max mt-1">🔴 Sem Estoque</span> : <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full block w-max mt-1">🟢 Em Estoque</span>}
-                             {p.subCategory && <span className="text-[10px] text-slate-400 font-bold uppercase">{p.subCategory}</span>}
+                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                               {p.hidden ? (
+                                 <span className="text-[10px] font-extrabold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                   🙈 Oculto na Loja
+                                 </span>
+                               ) : (
+                                 <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                   👁️ Habilitado
+                                 </span>
+                               )}
+                               {p.outOfStock ? (
+                                 <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">🔴 Sem Estoque</span>
+                               ) : (
+                                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">🟢 Em Estoque</span>
+                               )}
+                             </div>
+                             {p.subCategory && <span className="text-[10px] text-slate-400 font-bold uppercase mt-1 block">{p.subCategory}</span>}
                            </div>
-                           <div className="flex gap-3 mt-4 justify-end">
+                           <div className="flex gap-2 mt-3 justify-end flex-wrap">
                              <button 
                                 onClick={async () => {
                                   onUpdateProduct({ ...p, outOfStock: !p.outOfStock });
                                 }} 
-                                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-colors ${p.outOfStock ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-colors ${p.outOfStock ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
                               >
                                 {p.outOfStock ? 'Ativar Est.' : 'Zerar Est.'}
                               </button>
-                              <button onClick={() => handleEditProductClick(p)} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase">Editar</button>
-                             <button onClick={() => requestDelete('PRODUCT', p.id, p.name)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] font-black uppercase">Excluir</button>
+                              <button onClick={() => handleEditProductClick(p)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase">Editar</button>
+                             <button onClick={() => requestDelete('PRODUCT', p.id, p.name)} className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-[10px] font-black uppercase">Excluir</button>
                            </div>
                         </div>
                      </div>

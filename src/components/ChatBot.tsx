@@ -50,9 +50,10 @@ export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, i
 
   // Inicializa a sessão de chat quando o componente monta ou quando os produtos mudam
   useEffect(() => {
-    if (!products.length || !ai) return;
+    const visibleProducts = products.filter(p => !p.hidden);
+    if (!visibleProducts.length || !ai) return;
 
-    const menuContext = products.map(p => `${p.name} (${p.category}): R$ ${p.price.toFixed(2)} - ${p.description}`).join('\n');
+    const menuContext = visibleProducts.map(p => `${p.name} (${p.category}): R$ ${p.price.toFixed(2)} - ${p.description}`).join('\n');
     
     const systemInstruction = `
       Você é o BertimBot, o assistente virtual inteligente e simpático do VAPT VUPT - Pastel e Hotdog.

@@ -642,6 +642,7 @@ const App: React.FC = () => {
     if (!products) return [];
     return [...products]
       .filter(p => {
+        if (p.hidden) return false;
         const s = safeNormalize(searchTerm);
         const matchesSearch = !s || safeNormalize(p.name).includes(s) || safeNormalize(p.description).includes(s);
         const matchesCategory = selectedCategory === 'Todos' || safeNormalize(p.category) === safeNormalize(selectedCategory);

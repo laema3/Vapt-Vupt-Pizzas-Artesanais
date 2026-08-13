@@ -11,6 +11,7 @@ export interface Product {
   calories?: number;
   complements?: string[];
   outOfStock?: boolean;
+  hidden?: boolean;
 }
 
 export interface CategoryItem { 

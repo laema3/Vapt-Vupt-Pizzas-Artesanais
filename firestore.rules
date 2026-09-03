@@ -127,5 +127,9 @@ service cloud.firestore {
     match /pizza_recipes/{recipeId} {
       allow read, write: if true;
     }
+
+    match /daily_pizza_suggestions/{suggestionId} {
+      allow read, write: if true;
+    }
   }
 }

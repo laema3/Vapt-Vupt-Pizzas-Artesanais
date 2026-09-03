@@ -112,3 +112,20 @@ export interface Coupon {
   type: 'PERCENT' | 'FIXED';
   active: boolean;
 }
+
+export type DayOfWeek = 'domingo' | 'segunda' | 'terca' | 'quarta' | 'quinta' | 'sexta' | 'sabado';
+
+export interface DailyPizzaSuggestion {
+  id: string; // 'domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'
+  dayOfWeek: DayOfWeek;
+  dayName: string; // 'Domingo', 'Segunda-feira', etc.
+  dayShort: string; // 'DOM', 'SEG', etc.
+  title: string;
+  description: string;
+  image: string;
+  price?: number;
+  promoTag?: string;
+  productId?: string;
+  customMessage?: string;
+  updatedAt?: string;
+}

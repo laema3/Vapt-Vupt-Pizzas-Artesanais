@@ -5,6 +5,7 @@ import { compressImage } from '../services/imageService.ts';
 import { dbService } from '../services/dbService.ts';
 import { writeBatch, doc } from 'firebase/firestore';
 import { PizzaPricingCalculator } from "./PizzaPricingCalculator.tsx";
+import { WeeklyPizzaSuggestions } from "./WeeklyPizzaSuggestions.tsx";
 import { Eye, EyeOff } from 'lucide-react';
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
@@ -105,7 +106,7 @@ interface AdminPanelProps {
   onWaiterMode?: () => void;
 }
 
-type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'adicionais' | 'cupons' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'ajustes';
+type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'ajustes';
 
 type DeleteTarget = {
   type: 'ORDER' | 'PRODUCT' | 'CATEGORY' | 'SUBCATEGORY' | 'COMPLEMENT' | 'COUPON' | 'ZIP' | 'PAYMENT' | 'TABLE';
@@ -604,6 +605,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           <div className="pt-6 pb-2 px-4 text-xs font-black text-slate-600 uppercase tracking-widest">Gestão</div>
           <NavItem active={activeView === 'cupons'} icon="🏷️" label="Cupons" onClick={() => setActiveView('cupons')} />
           <NavItem active={activeView === 'precificacao'} icon="🍕" label="Precificação" onClick={() => setActiveView('precificacao')} />
+          <NavItem active={activeView === 'sugestoes'} icon="📅" label="Pizza da Semana" onClick={() => setActiveView('sugestoes')} />
           <NavItem active={activeView === 'entregas'} icon="🚚" label="Taxas Frete" onClick={() => setActiveView('entregas')} />
           <NavItem active={activeView === 'clientes'} icon="👥" label="Clientes" onClick={() => setActiveView('clientes')} />
           <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => setActiveView('pagamentos')} />
@@ -623,9 +625,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
            <div className="flex items-center gap-6">
               <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
                 <span className="p-2.5 bg-slate-800 text-slate-200 rounded-xl text-xl border border-slate-700 shadow-sm">
-                  {activeView === 'dashboard' ? '📊' : activeView === 'pedidos' ? '🛍️' : '⚙️'}
+                  {activeView === 'dashboard' ? '📊' : activeView === 'pedidos' ? '🛍️' : activeView === 'precificacao' ? '🍕' : activeView === 'sugestoes' ? '📅' : '⚙️'}
                 </span>
-                {activeView}
+                {activeView === 'sugestoes' ? 'Pizza da Semana (WhatsApp & Instagram)' : activeView}
               </h1>
               <button onClick={onToggleMaintenance} className={`hidden md:flex items-center gap-3 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${isMaintenanceMode ? 'bg-amber-600/10 border-amber-500 text-amber-500 hover:bg-amber-600/20' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800/80'}`}>
                 <div className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`}></div>
@@ -1034,6 +1036,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
                         {activeView === 'precificacao' && (
               <PizzaPricingCalculator />
+            )}
+
+            {activeView === 'sugestoes' && (
+              <WeeklyPizzaSuggestions
+                products={products}
+                storeName={storeName}
+                socialLinks={socialLinks}
+              />
             )}
 
             {activeView === 'entregas' && (

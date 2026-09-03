@@ -144,6 +144,25 @@
         "active": { "type": "boolean" }
       },
       "required": ["code", "discount", "type", "active"]
+    },
+    "DailyPizzaSuggestion": {
+      "title": "DailyPizzaSuggestion",
+      "description": "Weekly pizza suggestion for each day of the week with social sharing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "dayOfWeek": { "type": "string", "enum": ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"] },
+        "dayName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "price": { "type": "number" },
+        "promoTag": { "type": "string" },
+        "productId": { "type": "string" },
+        "customMessage": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["dayOfWeek", "dayName", "title", "description", "image"]
     }
   },
   "firestore": {
@@ -155,6 +174,7 @@
     "/customers/{customerId}": { "schema": "Customer", "description": "Customer profiles" },
     "/zipRanges/{zipRangeId}": { "schema": "ZipRange", "description": "Delivery ZIP ranges" },
     "/paymentSettings/{paymentSettingId}": { "schema": "PaymentSettings", "description": "Payment configurations" },
-    "/coupons/{couponId}": { "schema": "Coupon", "description": "Discount coupons" }
+    "/coupons/{couponId}": { "schema": "Coupon", "description": "Discount coupons" },
+    "/daily_pizza_suggestions/{suggestionId}": { "schema": "DailyPizzaSuggestion", "description": "Daily pizza suggestions for social sharing" }
   }
 }

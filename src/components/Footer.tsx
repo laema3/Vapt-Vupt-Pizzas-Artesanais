@@ -5,7 +5,7 @@ interface FooterProps {
   logoUrl: string;
   storeName?: string;
   isStoreOpen: boolean;
-  socialLinks: { instagram?: string; whatsapp?: string; facebook?: string; address?: string; city?: string; };
+  socialLinks: { instagram?: string; whatsapp?: string; facebook?: string; address?: string; city?: string; slogan?: string; };
   onAdminClick: () => void;
   onMotoboyClick: () => void;
   onWaiterClick?: () => void;
@@ -26,7 +26,7 @@ export const Footer: React.FC<FooterProps> = ({ logoUrl, storeName = 'VAPT VUPT'
             </div>
           </div>
           <p className="text-sm leading-relaxed max-w-xs">
-            O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.
+            {socialLinks.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.'}
           </p>
         </div>
 

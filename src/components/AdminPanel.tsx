@@ -186,6 +186,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
   const [localAddress, setLocalAddress] = useState(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
   const [localCity, setLocalCity] = useState(socialLinks?.city || 'Uberaba - MG');
+  const [localSlogan, setLocalSlogan] = useState(socialLinks?.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.');
   const [localStoreName, setLocalStoreName] = useState(storeName || 'VAPT VUPT');
   const [storeInfoSaved, setStoreInfoSaved] = useState(false);
   const [localMercadoPagoToken, setLocalMercadoPagoToken] = useState(paymentConfig?.mercadopagoAccessToken || '');
@@ -217,6 +218,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     setLocalInstagramPixel(socialLinks?.instagramPixelId || '');
     setLocalAddress(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
     setLocalCity(socialLinks?.city || 'Uberaba - MG');
+    setLocalSlogan(socialLinks?.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.');
   }, [socialLinks]);
 
   useEffect(() => {
@@ -1923,6 +1925,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                         <div className="space-y-1">
                            <label className={labelClass}>Facebook (URL completa)</label>
                            <input value={localFacebook} onChange={e => setLocalFacebook(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, facebook: localFacebook })} placeholder="https://facebook.com/bertimpastelhotdog" className={inputClass} />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                           <label className={labelClass}>Mensagem do Rodapé / Slogan (Subtítulo)</label>
+                           <textarea 
+                             value={localSlogan} 
+                             onChange={e => setLocalSlogan(e.target.value)} 
+                             onBlur={() => onUpdateSocialLinks({ ...socialLinks, slogan: localSlogan })} 
+                             placeholder="O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido." 
+                             rows={2}
+                             className={inputClass + " resize-none"} 
+                           />
+                           <p className="text-[11px] text-slate-400 font-medium">Texto descritivo exibido no rodapé do site.</p>
                         </div>
                      </div>
 

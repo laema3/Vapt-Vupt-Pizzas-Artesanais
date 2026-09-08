@@ -57,7 +57,7 @@ const App: React.FC = () => {
   const [socialLinks, setSocialLinks] = useState({ 
     instagram: '', whatsapp: '', facebook: '', 
     googleTagId: '', facebookPixelId: '', instagramPixelId: '',
-    address: '', city: ''
+    address: '', city: '', slogan: ''
   });
 
   useEffect(() => {
@@ -395,7 +395,7 @@ const App: React.FC = () => {
             setSocialLinks({ 
               instagram: settings.instagram || '', whatsapp: settings.whatsapp || '', facebook: settings.facebook || '',
               googleTagId: settings.googleTagId || '', facebookPixelId: settings.facebookPixelId || '', instagramPixelId: settings.instagramPixelId || '',
-              address: settings.address || '', city: settings.city || ''
+              address: settings.address || '', city: settings.city || '', slogan: settings.slogan || ''
             });
             const newPaymentConfig = {
               mercadopagoAccessToken: settings.mercadopagoAccessToken || '',

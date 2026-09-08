@@ -10,6 +10,7 @@ interface ChatBotProps {
   isStoreOpen: boolean;
   currentUser: Customer | null;
   onAddToCart: (product: Product, quantity: number) => void;
+  socialLinks?: { whatsapp?: string; address?: string; city?: string; };
 }
 
 // Inicializa o cliente Gemini
@@ -31,7 +32,7 @@ const getAiClient = () => {
   return aiClient;
 };
 
-export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, isStoreOpen, currentUser, onAddToCart }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, isStoreOpen, currentUser, onAddToCart, socialLinks }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ text: string; isUser: boolean; }[]>([
     { text: 'Olá! Sou o BertimBot 🤖. Posso te ajudar a escolher um pastel ou hotdog, tirar dúvidas ou até fazer seu pedido por aqui! O que você manda?', isUser: false }
@@ -54,6 +55,8 @@ export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, i
     if (!visibleProducts.length || !ai) return;
 
     const menuContext = visibleProducts.map(p => `${p.name} (${p.category}): R$ ${p.price.toFixed(2)} - ${p.description}`).join('\n');
+    const waNumber = socialLinks?.whatsapp || '5534991183728';
+    const formattedWa = waNumber.length >= 13 ? `(${waNumber.substring(2, 4)}) ${waNumber.substring(4, 9)}-${waNumber.substring(9)}` : '(34) 99118-3728';
     
     const systemInstruction = `
       Você é o BertimBot, o assistente virtual inteligente e simpático do VAPT VUPT - Pastel e Hotdog.
@@ -63,8 +66,8 @@ export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, i
       - Status: ${isStoreOpen ? 'ABERTO' : 'FECHADO'}.
       - Taxa de entrega base: R$ ${deliveryFee.toFixed(2)}.
       - Horário: Terça a Domingo, das 18h às 23h.
-      - Contato: (34) 99118-3728.
-      - Endereço: Rua dos Andradas, 123 - Abadia.
+      - Contato / WhatsApp: ${formattedWa}.
+      - Endereço: ${socialLinks?.address || 'Rua dos Andradas, 123 - Abadia'}, ${socialLinks?.city || 'Uberaba - MG'}.
 
       CARDÁPIO ATUAL:
       ${menuContext}
@@ -120,7 +123,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, i
       console.error("Erro ao inicializar chat Gemini:", e);
     }
 
-  }, [products, isStoreOpen, deliveryFee, ai]);
+  }, [products, isStoreOpen, deliveryFee, ai, socialLinks?.whatsapp, socialLinks?.address, socialLinks?.city]);
 
   const handleAddToCartTool = (productName: string, quantity: number = 1) => {
     // Busca fuzzy simples

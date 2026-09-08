@@ -1556,7 +1556,7 @@ const App: React.FC = () => {
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
       }} isKioskMode={isKioskMode} />
 
-      {!showAdminPanel && !isKioskMode && <ChatBot products={products} cart={cart} deliveryFee={currentDeliveryFee} isStoreOpen={isStoreOpen} currentUser={currentUser} onAddToCart={handleAddToCart} />}
+      {!showAdminPanel && !isKioskMode && <ChatBot products={products} cart={cart} deliveryFee={currentDeliveryFee} isStoreOpen={isStoreOpen} currentUser={currentUser} onAddToCart={handleAddToCart} socialLinks={socialLinks} />}
       {!showAdminPanel && !isKioskMode && <InstallBanner logoUrl={logoUrl} />}
 
       {isMaintenanceMode && !isAdminAuthenticated && (

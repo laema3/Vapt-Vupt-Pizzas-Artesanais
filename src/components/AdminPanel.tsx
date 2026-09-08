@@ -186,6 +186,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
   const [localAddress, setLocalAddress] = useState(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
   const [localCity, setLocalCity] = useState(socialLinks?.city || 'Uberaba - MG');
+  const [localStoreName, setLocalStoreName] = useState(storeName || 'VAPT VUPT');
+  const [storeInfoSaved, setStoreInfoSaved] = useState(false);
   const [localMercadoPagoToken, setLocalMercadoPagoToken] = useState(paymentConfig?.mercadopagoAccessToken || '');
   const [localMercadoPagoPublicKey, setLocalMercadoPagoPublicKey] = useState(paymentConfig?.mercadopagoPublicKey || '');
   const [localPagSeguroEmail, setLocalPagSeguroEmail] = useState(paymentConfig?.pagseguroEmail || '');
@@ -216,6 +218,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     setLocalAddress(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
     setLocalCity(socialLinks?.city || 'Uberaba - MG');
   }, [socialLinks]);
+
+  useEffect(() => {
+    setLocalStoreName(storeName || 'VAPT VUPT');
+  }, [storeName]);
 
   useEffect(() => {
     setLocalAdminUser(authSettings.adminUser);
@@ -1429,7 +1435,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
                         <div className="space-y-3 md:col-span-2">
                            <label className={labelClass}>Nome da Loja</label>
-                           <input type="text" value={storeName} onChange={(e) => onUpdateStoreName(e.target.value)} className={inputClass} placeholder="VAPT VUPT" />
+                           <input 
+                             type="text" 
+                             value={localStoreName} 
+                             onChange={(e) => {
+                               setLocalStoreName(e.target.value);
+                               onUpdateStoreName(e.target.value);
+                             }} 
+                             onBlur={() => onUpdateStoreName(localStoreName)}
+                             className={inputClass} 
+                             placeholder="VAPT VUPT" 
+                           />
                         </div>
 
                         <div className="space-y-3 md:col-span-2">
@@ -1847,31 +1863,82 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                   </section>
 
                   <section className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
-                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
-                       <span className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl">📱</span>
-                       Informações da Loja & Redes Sociais
-                     </h3>
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                       <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                         <span className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl">📱</span>
+                         Informações da Loja & Redes Sociais
+                       </h3>
+                       {storeInfoSaved && (
+                         <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl flex items-center gap-2 animate-in fade-in">
+                           ✓ Informações salvas com sucesso!
+                         </span>
+                       )}
+                     </div>
+
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1">
+                           <label className={labelClass}>Nome da Loja</label>
+                           <input 
+                             type="text"
+                             value={localStoreName} 
+                             onChange={e => {
+                               setLocalStoreName(e.target.value);
+                               onUpdateStoreName(e.target.value);
+                             }} 
+                             onBlur={() => onUpdateStoreName(localStoreName)} 
+                             placeholder="Ex: Pizzaria Bella / VAPT VUPT" 
+                             className={inputClass} 
+                           />
+                           <p className="text-[11px] text-slate-400 font-medium">Nome exibido no cardápio, topo e rodapé.</p>
+                        </div>
+                        <div className="space-y-1">
                            <label className={labelClass}>Endereço da Loja</label>
-                           <input value={localAddress} onChange={e => setLocalAddress(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, address: localAddress })} placeholder="Rua Exemplo, 123 - Centro" className={inputClass} />
+                           <input 
+                             value={localAddress} 
+                             onChange={e => setLocalAddress(e.target.value)} 
+                             onBlur={() => onUpdateSocialLinks({ ...socialLinks, address: localAddress })} 
+                             placeholder="Rua Exemplo, 123 - Centro" 
+                             className={inputClass} 
+                           />
+                           <p className="text-[11px] text-slate-400 font-medium">Endereço físico exibido aos clientes no rodapé.</p>
                         </div>
                         <div className="space-y-1">
                            <label className={labelClass}>Cidade - Estado</label>
                            <input value={localCity} onChange={e => setLocalCity(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, city: localCity })} placeholder="Uberaba - MG" className={inputClass} />
                         </div>
                         <div className="space-y-1">
-                           <label className={labelClass}>Instagram (URL completa)</label>
-                           <input value={localInstagram} onChange={e => setLocalInstagram(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, instagram: localInstagram })} placeholder="https://instagram.com/bertimpastelhotdog" className={inputClass} />
-                        </div>
-                        <div className="space-y-1">
                            <label className={labelClass}>WhatsApp (Número com DDD)</label>
                            <input value={localWhatsapp} onChange={e => setLocalWhatsapp(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, whatsapp: localWhatsapp })} placeholder="5534991183728" className={inputClass} />
+                        </div>
+                        <div className="space-y-1">
+                           <label className={labelClass}>Instagram (URL completa)</label>
+                           <input value={localInstagram} onChange={e => setLocalInstagram(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, instagram: localInstagram })} placeholder="https://instagram.com/bertimpastelhotdog" className={inputClass} />
                         </div>
                         <div className="space-y-1">
                            <label className={labelClass}>Facebook (URL completa)</label>
                            <input value={localFacebook} onChange={e => setLocalFacebook(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, facebook: localFacebook })} placeholder="https://facebook.com/bertimpastelhotdog" className={inputClass} />
                         </div>
+                     </div>
+
+                     <div className="flex justify-end pt-2">
+                        <button
+                          onClick={() => {
+                            onUpdateStoreName(localStoreName);
+                            onUpdateSocialLinks({
+                              ...socialLinks,
+                              address: localAddress,
+                              city: localCity,
+                              instagram: localInstagram,
+                              whatsapp: localWhatsapp,
+                              facebook: localFacebook,
+                            });
+                            setStoreInfoSaved(true);
+                            setTimeout(() => setStoreInfoSaved(false), 3000);
+                          }}
+                          className="px-6 py-3.5 bg-slate-900 text-white rounded-xl font-black uppercase text-xs tracking-wider hover:bg-black transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer"
+                        >
+                          <span>💾 Salvar Informações da Loja</span>
+                        </button>
                      </div>
                   </section>
                </div>

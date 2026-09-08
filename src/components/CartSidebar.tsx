@@ -208,20 +208,78 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           ) : (
             <div className="space-y-4">
               {items.map(item => (
-                <div key={item.id} className="flex gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div key={item.id} className="flex gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-xs">
                   <div className="w-20 h-20 bg-white rounded-xl shrink-0 overflow-hidden p-1 flex items-center justify-center border border-slate-100">
-                    {item.image ? <img src={item.image} className="w-full h-full object-contain rounded-lg" referrerPolicy="no-referrer" /> : <span className="text-2xl flex items-center justify-center h-full">🍔</span>}
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="w-full h-full object-contain rounded-lg" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="text-2xl flex items-center justify-center h-full">🍕</span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-1">
-                      <h4 className="font-black text-slate-800 text-sm uppercase truncate pr-2">{item.name}</h4>
-                      <button onClick={() => onRemove(item.id)} className="text-red-400 hover:text-red-600 text-xs">🗑️</button>
+                      <h4 className="font-black text-slate-800 text-sm uppercase truncate pr-2" title={item.name}>
+                        {item.name}
+                      </h4>
+                      <button 
+                        type="button"
+                        onClick={() => onRemove(item.id)} 
+                        className="text-red-400 hover:text-red-600 text-xs cursor-pointer p-1"
+                        title="Remover item"
+                      >
+                        🗑️
+                      </button>
                     </div>
-                    <p className="text-red-600 font-black text-xs mb-2">R$ {item.price.toFixed(2)}</p>
+
+                    {/* Detalhes Meio a Meio */}
+                    {item.pizzaMode === 'MEIO_A_MEIO' && item.secondFlavor && (
+                      <div className="mb-2 bg-amber-50 border border-amber-200 rounded-lg p-2 text-[11px] space-y-0.5">
+                        <div className="flex items-center gap-1 text-amber-900 font-black">
+                          <span>🌓</span> <span>Pizza Meio a Meio:</span>
+                        </div>
+                        <div className="text-slate-600 pl-3 font-medium flex justify-between">
+                          <span>• 1/2 {item.firstFlavor?.name || item.name}</span>
+                          <span className="text-amber-800 font-bold">R$ {(((item.firstFlavor?.price || item.price) / 2)).toFixed(2)}</span>
+                        </div>
+                        <div className="text-slate-600 pl-3 font-medium flex justify-between">
+                          <span>• 1/2 {item.secondFlavor.name}</span>
+                          <span className="text-amber-800 font-bold">R$ {((item.secondFlavor.price / 2)).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Adicionais / Bordas */}
+                    {item.selectedComplements && item.selectedComplements.length > 0 && (
+                      <div className="mb-2 bg-slate-100/70 rounded-lg px-2 py-1 text-[10px] text-slate-600 space-y-0.5">
+                        <span className="font-bold text-slate-700">Adicionais:</span>
+                        {item.selectedComplements.map((c, ci) => (
+                          <div key={ci} className="pl-2 flex justify-between">
+                            <span>+ {c.name}</span>
+                            <span className="font-bold text-slate-500">R$ {c.price.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-red-600 font-black text-xs mb-2">
+                      R$ {item.price.toFixed(2)} {item.quantity > 1 ? `(Total: R$ ${(item.price * item.quantity).toFixed(2)})` : ''}
+                    </p>
                     <div className="flex items-center gap-3 bg-white w-fit px-2 py-1 rounded-lg border border-slate-200 shadow-sm">
-                      <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-600 font-black">-</button>
+                      <button 
+                        type="button"
+                        onClick={() => onUpdateQuantity(item.id, -1)} 
+                        className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-600 font-black cursor-pointer"
+                      >
+                        -
+                      </button>
                       <span className="text-xs font-black text-slate-800 w-4 text-center">{item.quantity}</span>
-                      <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-600 font-black">+</button>
+                      <button 
+                        type="button"
+                        onClick={() => onUpdateQuantity(item.id, 1)} 
+                        className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-600 font-black cursor-pointer"
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
                 </div>

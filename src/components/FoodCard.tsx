@@ -41,9 +41,11 @@ export const FoodCard: React.FC<FoodCardProps> = ({ product, onAdd, onClick, log
             R$ {product.price.toFixed(2)}
           </span>
           <button 
-            onClick={(e) => { e.stopPropagation(); if (!product.outOfStock) { onAdd(product, 1); } }}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); if (!product.outOfStock) { onClick(product); } }}
             disabled={product.outOfStock}
-            className={`px-4 py-2 rounded-xl font-black uppercase text-base tracking-widest transition-colors shadow-md flex items-center justify-center ${product.outOfStock ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-green-600 text-white hover:bg-green-700 active:scale-95'}`}
+            className={`px-4 py-2 rounded-xl font-black uppercase text-base tracking-widest transition-colors shadow-md flex items-center justify-center cursor-pointer ${product.outOfStock ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-green-600 text-white hover:bg-green-700 active:scale-95'}`}
+            title="Escolher sabor e adicionar"
           >
             {product.outOfStock ? '✕' : '+'}
           </button>

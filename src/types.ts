@@ -33,9 +33,20 @@ export interface Complement {
   applicable_categories?: string[]; 
 }
 
+export interface CartFlavorInfo {
+  id: string;
+  name: string;
+  price: number;
+  halfPrice?: number;
+  image?: string;
+}
+
 export interface CartItem extends Product { 
   quantity: number; 
   selectedComplements?: Complement[]; 
+  pizzaMode?: 'INTEIRA' | 'MEIO_A_MEIO';
+  firstFlavor?: CartFlavorInfo;
+  secondFlavor?: CartFlavorInfo;
 }
 
 export type OrderStatus = 'NOVO' | 'PREPARANDO' | 'PRONTO PARA RETIRADA' | 'SAIU PARA ENTREGA' | 'FINALIZADO' | 'CANCELADO' | 'AGUARDANDO PAGAMENTO';

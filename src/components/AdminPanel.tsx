@@ -291,6 +291,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
         <span>${item.quantity}x ${item.name}</span>
         <span>R$ ${(item.price * item.quantity).toFixed(2)}</span>
       </div>
+      ${item.pizzaMode === 'MEIO_A_MEIO' && item.secondFlavor ? `<div style="font-size:10px; padding-left:10px; color:#555;">• 1/2 ${item.firstFlavor?.name || item.name} + 1/2 ${item.secondFlavor.name}</div>` : ''}
       ${(item.selectedComplements || []).map(c => `<div style="font-size:10px; padding-left:10px; color:#555;">+ ${c.name}</div>`).join('')}
     `).join('');
 
@@ -737,6 +738,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                                   <li key={idx} className="flex justify-between items-start text-sm">
                                     <div className="flex flex-col">
                                        <span className="font-black text-slate-700 uppercase leading-none">{item.quantity}x {item.name}</span>
+                                       {item.pizzaMode === 'MEIO_A_MEIO' && item.secondFlavor && (
+                                         <span className="text-[10px] text-amber-800 font-bold ml-4 mt-1 bg-amber-50 px-2 py-0.5 rounded-md w-fit border border-amber-200">
+                                           🌓 1/2 {item.firstFlavor?.name || item.name} (R$ {(((item.firstFlavor?.price || item.price) / 2)).toFixed(2)}) + 1/2 {item.secondFlavor.name} (R$ {((item.secondFlavor.price / 2)).toFixed(2)})
+                                         </span>
+                                       )}
                                        {item.selectedComplements?.map((c, ci) => (
                                          <span key={ci} className="text-[10px] text-red-600 font-bold ml-4 mt-1 block">+ {c.name}</span>
                                        ))}

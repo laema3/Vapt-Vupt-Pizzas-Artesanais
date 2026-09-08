@@ -659,11 +659,64 @@ const App: React.FC = () => {
     return subCategories.filter(s => s.categoryId === currentCat.id).sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedCategory, categories, subCategories]);
 
-  const handleAddToCart = (product: Product, quantity: number, comps?: Complement[]) => {
+  const handleAddToCart = (
+    product: Product, 
+    quantity: number, 
+    comps?: Complement[],
+    pizzaOptions?: {
+      mode: 'INTEIRA' | 'MEIO_A_MEIO';
+      secondFlavor?: Product;
+      calculatedBasePrice: number;
+    }
+  ) => {
     const compsPrice = comps?.reduce((acc, c) => acc + (c.price || 0), 0) || 0;
-    const finalPrice = product.price + compsPrice;
-    setCart(prev => [...prev, { ...product, price: finalPrice, quantity, selectedComplements: comps }]);
-    setToast({ show: true, msg: `${quantity}x ${product.name} no carrinho!`, type: 'success' });
+    
+    let itemName = product.name;
+    let basePrice = product.price;
+    const isMeioAMeio = pizzaOptions?.mode === 'MEIO_A_MEIO' && !!pizzaOptions.secondFlavor;
+
+    if (isMeioAMeio && pizzaOptions.secondFlavor) {
+      basePrice = (product.price / 2) + (pizzaOptions.secondFlavor.price / 2);
+      itemName = `Pizza Meio a Meio (1/2 ${product.name} + 1/2 ${pizzaOptions.secondFlavor.name})`;
+    }
+
+    const finalUnitPrice = basePrice + compsPrice;
+    
+    const cartItemId = isMeioAMeio && pizzaOptions.secondFlavor
+      ? `${product.id}_half_${pizzaOptions.secondFlavor.id}_${Date.now()}`
+      : `${product.id}_${Date.now()}`;
+
+    const newCartItem: CartItem = {
+      ...product,
+      id: cartItemId,
+      name: itemName,
+      price: finalUnitPrice,
+      quantity,
+      selectedComplements: comps,
+      pizzaMode: pizzaOptions?.mode,
+      firstFlavor: {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        halfPrice: product.price / 2
+      },
+      secondFlavor: isMeioAMeio && pizzaOptions.secondFlavor ? {
+        id: pizzaOptions.secondFlavor.id,
+        name: pizzaOptions.secondFlavor.name,
+        price: pizzaOptions.secondFlavor.price,
+        halfPrice: pizzaOptions.secondFlavor.price / 2,
+        image: pizzaOptions.secondFlavor.image
+      } : undefined
+    };
+
+    setCart(prev => [...prev, newCartItem]);
+    setToast({ 
+      show: true, 
+      msg: isMeioAMeio 
+        ? `${quantity}x Pizza Meio a Meio no carrinho!` 
+        : `${quantity}x ${product.name} no carrinho!`, 
+      type: 'success' 
+    });
     setIsCartOpen(true);
   };
 
@@ -1415,7 +1468,16 @@ const App: React.FC = () => {
         forcedDeliveryType={forcedDeliveryType}
         zipRanges={zipRanges}
       />
-      <ProductModal product={selectedProduct} complements={complements} categories={categories} onClose={() => setSelectedProduct(null)} onAdd={handleAddToCart} isStoreOpen={isStoreOpen} logoUrl={logoUrl} />
+      <ProductModal 
+        product={selectedProduct} 
+        allProducts={products}
+        complements={complements} 
+        categories={categories} 
+        onClose={() => setSelectedProduct(null)} 
+        onAdd={handleAddToCart} 
+        isStoreOpen={isStoreOpen} 
+        logoUrl={logoUrl} 
+      />
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 
@@ -1480,7 +1542,17 @@ const App: React.FC = () => {
       <OrderSuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} order={lastOrder} tables={tables} onSendWhatsApp={() => {
         if (!lastOrder) return;
         const phone = (socialLinks.whatsapp || '5534991183728').replace(/\D/g, '');
-        const text = `🍔 *NOVO PEDIDO #${lastOrder.id}*\n\n*Cliente:* ${lastOrder.customerName}\n*Itens:*\n${lastOrder.items.map(i => `▪️ ${i.quantity}x ${i.name}`).join('\n')}\n\n*Total:* R$ ${lastOrder.total.toFixed(2)}`;
+        const itemsText = lastOrder.items.map(i => {
+          let line = `▪️ ${i.quantity}x ${i.name} - R$ ${(i.price * i.quantity).toFixed(2)}`;
+          if (i.pizzaMode === 'MEIO_A_MEIO' && i.secondFlavor) {
+            line += `\n   └ 🍕 1/2 ${i.firstFlavor?.name || i.name} (R$ ${(((i.firstFlavor?.price || i.price) / 2)).toFixed(2)}) + 1/2 ${i.secondFlavor.name} (R$ ${((i.secondFlavor.price / 2)).toFixed(2)})`;
+          }
+          if (i.selectedComplements && i.selectedComplements.length > 0) {
+            line += `\n   └ ➕ ${i.selectedComplements.map(c => c.name).join(', ')}`;
+          }
+          return line;
+        }).join('\n');
+        const text = `🍕 *NOVO PEDIDO #${lastOrder.orderNumber ? lastOrder.orderNumber : lastOrder.id}*\n\n*Cliente:* ${lastOrder.customerName}\n*Itens:*\n${itemsText}\n\n*Total:* R$ ${lastOrder.total.toFixed(2)}`;
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
       }} isKioskMode={isKioskMode} />
 

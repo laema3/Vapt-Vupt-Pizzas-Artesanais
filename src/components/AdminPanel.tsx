@@ -42,6 +42,8 @@ interface AdminPanelProps {
     instagramPixelId?: string;
     address?: string;
     city?: string;
+    slogan?: string;
+    orderEstimatedMinutes?: number;
   };
   onUpdateSocialLinks: (links: { 
     instagram?: string; 
@@ -52,6 +54,8 @@ interface AdminPanelProps {
     instagramPixelId?: string;
     address?: string;
     city?: string;
+    slogan?: string;
+    orderEstimatedMinutes?: number;
   }) => void;
   paymentConfig: {
     mercadopagoAccessToken: string;
@@ -188,7 +192,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [localCity, setLocalCity] = useState(socialLinks?.city || 'Uberaba - MG');
   const [localSlogan, setLocalSlogan] = useState(socialLinks?.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.');
   const [localStoreName, setLocalStoreName] = useState(storeName || 'VAPT VUPT');
+  const [localOrderMinutes, setLocalOrderMinutes] = useState(socialLinks?.orderEstimatedMinutes || 30);
   const [storeInfoSaved, setStoreInfoSaved] = useState(false);
+  const [orderMinutesSaved, setOrderMinutesSaved] = useState(false);
   const [localMercadoPagoToken, setLocalMercadoPagoToken] = useState(paymentConfig?.mercadopagoAccessToken || '');
   const [localMercadoPagoPublicKey, setLocalMercadoPagoPublicKey] = useState(paymentConfig?.mercadopagoPublicKey || '');
   const [localPagSeguroEmail, setLocalPagSeguroEmail] = useState(paymentConfig?.pagseguroEmail || '');
@@ -219,6 +225,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     setLocalAddress(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
     setLocalCity(socialLinks?.city || 'Uberaba - MG');
     setLocalSlogan(socialLinks?.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.');
+    setLocalOrderMinutes(socialLinks?.orderEstimatedMinutes ? Number(socialLinks.orderEstimatedMinutes) : 30);
   }, [socialLinks]);
 
   useEffect(() => {
@@ -1951,6 +1958,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                               instagram: localInstagram,
                               whatsapp: localWhatsapp,
                               facebook: localFacebook,
+                              slogan: localSlogan,
+                              orderEstimatedMinutes: Math.max(1, Number(localOrderMinutes) || 30),
                             });
                             setStoreInfoSaved(true);
                             setTimeout(() => setStoreInfoSaved(false), 3000);
@@ -1960,6 +1969,78 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                           <span>💾 Salvar Informações da Loja</span>
                         </button>
                      </div>
+                  </section>
+
+                  {/* SEÇÃO DE TEMPO ESTIMADO DO PEDIDO */}
+                  <section className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                        <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-xl">⏱️</span>
+                        Tempo Estimado do Pedido (Contagem Regressiva)
+                      </h3>
+                      {orderMinutesSaved && (
+                        <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl flex items-center gap-2 animate-in fade-in">
+                          ✓ Tempo estimado salvo com sucesso!
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/80 rounded-3xl p-6 sm:p-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                            <span>Quantidade de Minutos do Pedido</span>
+                            <span className="bg-amber-200 text-amber-950 text-[11px] px-2.5 py-0.5 rounded-full font-black">
+                              Atual: {localOrderMinutes} min
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <input 
+                              type="number"
+                              min="1"
+                              max="360"
+                              value={localOrderMinutes}
+                              onChange={e => {
+                                const val = Math.max(1, parseInt(e.target.value) || 0);
+                                setLocalOrderMinutes(val);
+                              }}
+                              onBlur={() => {
+                                const val = Math.max(1, Number(localOrderMinutes) || 30);
+                                onUpdateSocialLinks({
+                                  ...socialLinks,
+                                  orderEstimatedMinutes: val
+                                });
+                              }}
+                              placeholder="Ex: 30"
+                              className="w-full bg-white border-2 border-amber-300 rounded-2xl py-4 px-5 text-2xl font-black text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-amber-400/40 focus:border-amber-500 transition-all"
+                            />
+                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 uppercase tracking-widest">
+                              Minutos
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-900/80 font-medium leading-relaxed mt-2">
+                            📌 <strong>Como funciona:</strong> Ao cliente escolher a pizza e finalizar o pedido, iniciará uma contagem regressiva retroativa com esses minutos no próprio pedido. Faltando <strong>5 minutos finais</strong>, um <strong>alerta com cor vermelha pulsante</strong> será disparado automaticamente na tela do cliente.
+                          </p>
+                        </div>
+
+                        <div>
+                          <button
+                            onClick={() => {
+                              const minutesToSave = Math.max(1, Number(localOrderMinutes) || 30);
+                              onUpdateSocialLinks({
+                                ...socialLinks,
+                                orderEstimatedMinutes: minutesToSave,
+                              });
+                              setOrderMinutesSaved(true);
+                              setTimeout(() => setOrderMinutesSaved(false), 3000);
+                            }}
+                            className="w-full py-4 bg-amber-500 text-white rounded-2xl font-black uppercase text-xs sm:text-sm tracking-wider hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <span>💾 Salvar Minutos</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </section>
                </div>
             )}

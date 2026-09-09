@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { formatOrderNumber } from '../utils/format';
+import { OrderCountdownTimer } from './OrderCountdownTimer';
 
 const MapUpdater = ({ center }: { center: [number, number] }) => {
   const map = useMap();
@@ -18,9 +19,10 @@ interface CustomerOrdersProps {
   orders: Order[];
   onBack: () => void;
   onReorder: (order: Order) => void;
+  defaultEstimatedMinutes?: number;
 }
 
-export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, onReorder }) => {
+export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, onReorder, defaultEstimatedMinutes = 30 }) => {
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
 
   useEffect(() => {
@@ -99,6 +101,16 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, 
                   <p className="text-2xl font-black text-red-600">R$ {order.total.toFixed(2)}</p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{order.items.length} itens</p>
                 </div>
+              </div>
+
+              {/* Cronômetro Regressivo do Pedido */}
+              <div className="mb-6">
+                <OrderCountdownTimer
+                  createdAt={order.createdAt}
+                  estimatedMinutes={order.estimatedMinutes || defaultEstimatedMinutes || 30}
+                  status={order.status}
+                  orderNumber={order.orderNumber ? formatOrderNumber(order.orderNumber) : order.id.substring(0, 6)}
+                />
               </div>
 
               <div className="space-y-3 mb-6">

@@ -86,6 +86,7 @@ export interface Order {
   motoboyName?: string; // NOVO: Nome do motoboy que pegou o pedido
   tableId?: string; // NOVO: ID da mesa se for pedido na mesa
   orderNumber?: number; // NOVO: Número sequencial do pedido
+  estimatedMinutes?: number; // Tempo estimado do pedido em minutos configurado no painel
 }
 
 export interface Customer {

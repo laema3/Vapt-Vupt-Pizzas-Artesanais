@@ -57,7 +57,7 @@ const App: React.FC = () => {
   const [socialLinks, setSocialLinks] = useState({ 
     instagram: '', whatsapp: '', facebook: '', 
     googleTagId: '', facebookPixelId: '', instagramPixelId: '',
-    address: '', city: '', slogan: ''
+    address: '', city: '', slogan: '', orderEstimatedMinutes: 30
   });
 
   useEffect(() => {
@@ -395,7 +395,8 @@ const App: React.FC = () => {
             setSocialLinks({ 
               instagram: settings.instagram || '', whatsapp: settings.whatsapp || '', facebook: settings.facebook || '',
               googleTagId: settings.googleTagId || '', facebookPixelId: settings.facebookPixelId || '', instagramPixelId: settings.instagramPixelId || '',
-              address: settings.address || '', city: settings.city || '', slogan: settings.slogan || ''
+              address: settings.address || '', city: settings.city || '', slogan: settings.slogan || '',
+              orderEstimatedMinutes: settings.orderEstimatedMinutes ? Number(settings.orderEstimatedMinutes) : 30
             });
             const newPaymentConfig = {
               mercadopagoAccessToken: settings.mercadopagoAccessToken || '',
@@ -503,7 +504,8 @@ const App: React.FC = () => {
                     setSocialLinks({ 
                       instagram: settings.instagram || '', whatsapp: settings.whatsapp || '', facebook: settings.facebook || '',
                       googleTagId: settings.googleTagId || '', facebookPixelId: settings.facebookPixelId || '', instagramPixelId: settings.instagramPixelId || '',
-                      address: settings.address || '', city: settings.city || ''
+                      address: settings.address || '', city: settings.city || '', slogan: settings.slogan || '',
+                      orderEstimatedMinutes: settings.orderEstimatedMinutes ? Number(settings.orderEstimatedMinutes) : 30
                     });
                     
                     // Atualiza paymentConfig de forma segura usando o estado anterior
@@ -1061,7 +1063,8 @@ const App: React.FC = () => {
         const newOrder: Order = {
           id: orderId, customerId: currentUser?.email || 'kiosk', customerName: currentUser?.name || 'Cliente Local', customerPhone: currentUser?.phone || '000',
           customerAddress: resolvedAddress,
-          items: [...cart], total, deliveryFee: fee, deliveryType: (isKioskMode && deliveryType !== 'TABLE') ? 'PICKUP' : deliveryType, status: 'NOVO', paymentMethod: deliveryType === 'TABLE' ? 'PAGAMENTO NO BALCÃO' : paymentMethod, createdAt: new Date().toISOString(), pointsEarned: Math.floor(total), changeFor: changeFor || 0, discountValue: discount || 0, couponCode: couponCode || '', tableId: tableId || '', orderNumber: nextOrderNumber
+          items: [...cart], total, deliveryFee: fee, deliveryType: (isKioskMode && deliveryType !== 'TABLE') ? 'PICKUP' : deliveryType, status: 'NOVO', paymentMethod: deliveryType === 'TABLE' ? 'PAGAMENTO NO BALCÃO' : paymentMethod, createdAt: new Date().toISOString(), pointsEarned: Math.floor(total), changeFor: changeFor || 0, discountValue: discount || 0, couponCode: couponCode || '', tableId: tableId || '', orderNumber: nextOrderNumber,
+          estimatedMinutes: socialLinks.orderEstimatedMinutes || 30
         };
         
         // Remove campos opcionais que podem ser undefined
@@ -1307,6 +1310,7 @@ const App: React.FC = () => {
                   orders={myOrders} 
                   onBack={() => setActiveView('home')} 
                   onReorder={() => {}} 
+                  defaultEstimatedMinutes={socialLinks.orderEstimatedMinutes || 30}
                 />
               );
             })()}
@@ -1539,7 +1543,14 @@ const App: React.FC = () => {
         correctPass={authSettings.waiterPass}
       />
 
-      <OrderSuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} order={lastOrder} tables={tables} onSendWhatsApp={() => {
+      <OrderSuccessModal 
+        isOpen={isSuccessModalOpen} 
+        onClose={() => setIsSuccessModalOpen(false)} 
+        order={lastOrder} 
+        tables={tables} 
+        defaultEstimatedMinutes={socialLinks.orderEstimatedMinutes || 30}
+        onViewMyOrders={() => setActiveView('my-orders')}
+        onSendWhatsApp={() => {
         if (!lastOrder) return;
         const phone = (socialLinks.whatsapp || '5534991183728').replace(/\D/g, '');
         const itemsText = lastOrder.items.map(i => {

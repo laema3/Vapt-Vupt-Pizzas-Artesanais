@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/dbService';
 import { Product } from '../types';
+import { FileSpreadsheet, Download } from 'lucide-react';
+import { exportPricingToExcel } from '../utils/exportPricingExcel';
 
 interface Ingredient {
   id: string;
@@ -457,6 +459,54 @@ export const PizzaPricingCalculator: React.FC = () => {
     setConfirmDeleteRecipeId(null);
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportExcel = () => {
+    try {
+      setIsExporting(true);
+      exportPricingToExcel(ingredients, recipes, products, calculateRecipeCost);
+      setSyncNotification('📊 Planilha Excel exportada com sucesso contendo todas as fichas técnicas, insumos e margens!');
+      setTimeout(() => setSyncNotification(null), 5000);
+    } catch (err) {
+      console.error('Erro ao exportar Excel:', err);
+      setSyncNotification('❌ Não foi possível gerar a planilha Excel. Tente novamente.');
+      setTimeout(() => setSyncNotification(null), 5000);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const syncPriceToProductDirectly = async (recipe: PizzaRecipe, targetProductId?: string) => {
+    const cost = calculateRecipeCost(recipe.ingredients || []);
+    const calculatedPrice = Number((cost * (1 + recipe.margin / 100)).toFixed(2));
+
+    if (targetProductId) {
+      const prod = products.find(p => p.id === targetProductId);
+      if (prod) {
+        const updated = { ...prod, price: calculatedPrice };
+        await dbService.save('products', prod.id, updated);
+        setProducts(prev => prev.map(p => p.id === prod.id ? updated : p));
+        setSyncNotification(`✅ Preço de "${prod.name}" atualizado para R$ ${calculatedPrice.toFixed(2)} no cardápio!`);
+        setTimeout(() => setSyncNotification(null), 4000);
+      }
+    } else {
+      const newProd: Product = {
+        id: Math.random().toString(36).substring(7),
+        name: recipe.name,
+        price: calculatedPrice,
+        description: 'Pizza artesanal preparada com ingredientes selecionados.',
+        category: 'PIZZAS SALGADAS',
+        imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=60',
+        available: true,
+      };
+      await dbService.save('products', newProd.id, newProd);
+      setProducts(prev => [...prev, newProd]);
+      await handleLinkProductToRecipe(recipe, newProd.id);
+      setSyncNotification(`🎉 Novo produto "${recipe.name}" criado no cardápio com preço R$ ${calculatedPrice.toFixed(2)}!`);
+      setTimeout(() => setSyncNotification(null), 4000);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center animate-pulse font-bold text-slate-500">Carregando Calculadora...</div>;
 
   const inputClass = "w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-red-500 transition-all";
@@ -464,11 +514,60 @@ export const PizzaPricingCalculator: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Top Banner & Exportação para Excel */}
+      <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 p-6 sm:p-8 rounded-[36px] text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-700/60">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 bg-emerald-700/60 text-emerald-200 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border border-emerald-500/40">
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Planilha & Fichas Técnicas
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-3">
+            Precificação & Custos
+          </h2>
+          <p className="text-emerald-100/80 text-xs sm:text-sm font-medium max-w-2xl leading-relaxed">
+            Exporte todos os dados cadastrados (fichas técnicas completas, ingredientes, custos base, margens de lucro, CMV e comparação com a loja) para uma planilha Excel (.xlsx) organizada com abas detalhadas.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <span className="bg-white/10 backdrop-blur-sm text-white font-bold text-xs px-3 py-1 rounded-xl border border-white/10">
+              🍅 {ingredients.length} Ingredientes Cadastrados
+            </span>
+            <span className="bg-white/10 backdrop-blur-sm text-white font-bold text-xs px-3 py-1 rounded-xl border border-white/10">
+              🍕 {recipes.length} Receitas / Pizzas
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleExportExcel}
+          disabled={isExporting || (ingredients.length === 0 && recipes.length === 0)}
+          className={`px-6 py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center gap-3 transition-all shadow-lg active:scale-95 whitespace-nowrap cursor-pointer ${
+            ingredients.length === 0 && recipes.length === 0
+              ? 'bg-emerald-950/60 text-emerald-400/50 cursor-not-allowed border border-emerald-800'
+              : 'bg-white text-emerald-900 hover:bg-emerald-50 hover:shadow-emerald-900/40 border border-white'
+          }`}
+          title="Baixar planilha Excel com tudo o que estiver cadastrado em precificação"
+        >
+          <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+          <span>{isExporting ? 'Exportando Planilha...' : 'Exportar Planilha Excel'}</span>
+          <Download className="w-4 h-4 text-emerald-700" />
+        </button>
+      </div>
+
       <div ref={ingFormRef} className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
-        <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-3">
-          <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-xl">🍅</span>
-          Banco de Ingredientes
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+            <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-xl">🍅</span>
+            Banco de Ingredientes
+          </h3>
+          <button 
+            onClick={handleExportExcel}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer active:scale-95"
+            title="Exportar tudo para o Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Exportar para Excel</span>
+          </button>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="space-y-1 md:col-span-2">
@@ -766,8 +865,18 @@ export const PizzaPricingCalculator: React.FC = () => {
                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Receitas Salvas ({recipes.length})</h4>
                  <p className="text-xs text-slate-500 mt-0.5">Fichas técnicas e parâmetros de custos como base para seus preços manuais</p>
                </div>
-               <div className="bg-slate-100 text-slate-600 text-xs font-bold px-3.5 py-1.5 rounded-xl border border-slate-200">
-                 Preços da loja manuais e desvinculados
+               <div className="flex items-center gap-3">
+                 <button 
+                   onClick={handleExportExcel}
+                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer active:scale-95"
+                   title="Exportar todas as receitas para o Excel"
+                 >
+                   <FileSpreadsheet className="w-4 h-4" />
+                   <span>Exportar Excel</span>
+                 </button>
+                 <div className="bg-slate-100 text-slate-600 text-xs font-bold px-3.5 py-2 rounded-xl border border-slate-200">
+                   Preços manuais
+                 </div>
                </div>
              </div>
              

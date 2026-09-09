@@ -147,10 +147,9 @@ export function printOrderReceipt(order: Order, storeName?: string, socialLinks?
         </div>
         <div class="footer">
           <p style="font-size: 12px; font-weight: 800; margin-bottom: 4px;">Obrigado pela preferência!</p>
-          <p>CNPJ: 64.412.248/0001-42 - ${storeName || 'BELLA BORDA'} PIZZARIA LTDA</p>
+          <p>${storeName || 'BELLA BORDA'} PIZZARIA</p>
           <p>${addressLine}</p>
           <p>${cityLine} - FONE: ${formattedWa}</p>
-          <p>IE: 53999960035</p>
           <p class="site-highlight">www.bellaborda.com.br</p>
         </div>
       </div>

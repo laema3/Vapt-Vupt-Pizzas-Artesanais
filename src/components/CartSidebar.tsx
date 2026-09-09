@@ -256,11 +256,19 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       return (
                         <div className="mb-2 bg-slate-100/80 rounded-xl p-2 text-[10px] text-slate-700 space-y-1.5 border border-slate-200/60">
                           {borda && (
-                            <div className="bg-amber-50/90 border border-amber-200/80 rounded-lg p-1.5 text-amber-950 flex justify-between items-center">
+                            <div className={`border rounded-lg p-1.5 flex justify-between items-center ${
+                              borda.price > 0 
+                                ? 'bg-amber-50/90 border-amber-200/80 text-amber-950' 
+                                : 'bg-slate-50 border-slate-200 text-slate-700'
+                            }`}>
                               <span className="font-black flex items-center gap-1">
                                 <span>🥖</span> <span>Borda: {borda.name}</span>
                               </span>
-                              <span className="font-black text-amber-700">+ R$ {borda.price.toFixed(2)}</span>
+                              {borda.price > 0 ? (
+                                <span className="font-black text-amber-700">+ R$ {borda.price.toFixed(2)}</span>
+                              ) : (
+                                <span className="font-bold text-slate-400 text-[9px]">Tradicional (Grátis)</span>
+                              )}
                             </div>
                           )}
 

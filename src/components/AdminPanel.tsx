@@ -1000,9 +1000,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                               Bordas Recheadas com Valores
                            </h4>
                            <p className="text-xs text-amber-900 font-medium mt-1 leading-relaxed max-w-2xl">
-                              <strong>Regra do Sistema:</strong> Quando o cliente estiver montando a pizza, ele poderá escolher 
-                              <strong> apenas 1 borda</strong>. Sempre que ele escolher uma borda, 
-                              <strong> todas as outras ficam desabilitadas automaticamente</strong>.
+                              <strong>Regra do Sistema:</strong> Para a escolha não passar batido, a seleção da borda é <strong>obrigatória</strong> (podendo escolher 1 borda recheada ou a opção expressa <strong>SEM BORDA</strong>). Ao escolher uma borda, as demais ficam desabilitadas automaticamente.
                            </p>
                         </div>
                      </div>

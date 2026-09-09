@@ -1570,7 +1570,7 @@ const App: React.FC = () => {
           const borda = i.selectedBorda || i.selectedComplements?.find(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda'));
           const adicionais = i.selectedAdditionals || i.selectedComplements?.filter(c => c !== borda) || [];
           if (borda) {
-            line += `\n   └ 🥖 Borda: ${borda.name} (+ R$ ${borda.price.toFixed(2)})`;
+            line += `\n   └ 🥖 Borda: ${borda.name}${borda.price > 0 ? ` (+ R$ ${borda.price.toFixed(2)})` : ' (Tradicional)'}`;
           }
           if (adicionais.length > 0) {
             line += `\n   └ ➕ Adicionais: ${adicionais.map(c => `${c.name} (+ R$ ${c.price.toFixed(2)})`).join(', ')}`;

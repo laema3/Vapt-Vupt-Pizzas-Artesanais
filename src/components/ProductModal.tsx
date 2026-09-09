@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Complement, CategoryItem } from '../types';
 
 interface ProductModalProps {
@@ -25,6 +25,14 @@ interface ProductModalProps {
   logoUrl: string;
 }
 
+const NO_BORDA_COMPLEMENT: Complement = {
+  id: 'sem_borda',
+  name: 'Sem Borda Recheada',
+  price: 0,
+  active: true,
+  type: 'BORDA',
+};
+
 export const ProductModal: React.FC<ProductModalProps> = ({ 
   product, 
   allProducts = [], 
@@ -36,20 +44,40 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   logoUrl 
 }) => {
   const [quantity, setQuantity] = useState(1);
-  const [selectedBorda, setSelectedBorda] = useState<Complement | null>(null);
+  const [bordaSelection, setBordaSelection] = useState<Complement | 'NONE' | null>(null);
   const [selectedAdicionais, setSelectedAdicionais] = useState<Complement[]>([]);
   const [pizzaMode, setPizzaMode] = useState<'INTEIRA' | 'MEIO_A_MEIO'>('INTEIRA');
   const [selectedSecondFlavor, setSelectedSecondFlavor] = useState<Product | null>(null);
   const [flavorSearch, setFlavorSearch] = useState('');
+  const [bordaHighlightAlert, setBordaHighlightAlert] = useState(false);
+
+  // Refs para auto-scroll suave entre opções
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const secondFlavorSectionRef = useRef<HTMLDivElement>(null);
+  const bordaSectionRef = useRef<HTMLDivElement>(null);
+  const adicionaisSectionRef = useRef<HTMLDivElement>(null);
+  const footerSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToSection = (targetRef: React.RefObject<HTMLDivElement | null>) => {
+    setTimeout(() => {
+      if (targetRef.current) {
+        targetRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }
+    }, 130);
+  };
 
   useEffect(() => {
     if (product) {
       setQuantity(1);
-      setSelectedBorda(null);
+      setBordaSelection(null);
       setSelectedAdicionais([]);
       setPizzaMode('INTEIRA');
       setSelectedSecondFlavor(null);
       setFlavorSearch('');
+      setBordaHighlightAlert(false);
     }
   }, [product]);
 
@@ -144,22 +172,56 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     });
   }, [product, allProducts, flavorSearch]);
 
+  // Objeto de borda efetivo (se 'NONE', vira objeto sem_borda com price: 0)
+  const effectiveBorda: Complement | null = useMemo(() => {
+    if (bordaSelection === 'NONE') return NO_BORDA_COMPLEMENT;
+    if (bordaSelection && typeof bordaSelection === 'object') return bordaSelection;
+    return null;
+  }, [bordaSelection]);
+
   // Lista combinada de complementos para salvar no pedido
   const selectedComplements = useMemo(() => {
     return [
-      ...(selectedBorda ? [selectedBorda] : []),
+      ...(effectiveBorda ? [effectiveBorda] : []),
       ...selectedAdicionais
     ];
-  }, [selectedBorda, selectedAdicionais]);
+  }, [effectiveBorda, selectedAdicionais]);
+
+  // Regra de obrigatoriedade da borda
+  const isBordaMandatory = Boolean(isPizza && bordaItems.length > 0);
+  const hasBordaDecision = !isBordaMandatory || bordaSelection !== null;
 
   // Seleção de Borda: Apenas 1 borda. Ao escolher uma, as demais ficam desabilitadas.
   const handleSelectBorda = (borda: Complement) => {
-    if (selectedBorda?.id === borda.id) {
-      // Se já clicou na mesma, desseleciona
-      setSelectedBorda(null);
+    setBordaHighlightAlert(false);
+    if (bordaSelection !== 'NONE' && bordaSelection?.id === borda.id) {
+      // Desmarca a borda atual
+      setBordaSelection(null);
     } else {
       // Seleciona a borda escolhida
-      setSelectedBorda(borda);
+      setBordaSelection(borda);
+      // Auto-scroll para a próxima etapa
+      if (adicionalItems.length > 0) {
+        scrollToSection(adicionaisSectionRef);
+      } else {
+        scrollToSection(footerSectionRef);
+      }
+    }
+  };
+
+  // Seleção explícita de "SEM BORDA"
+  const handleSelectNoBorda = () => {
+    setBordaHighlightAlert(false);
+    if (bordaSelection === 'NONE') {
+      setBordaSelection(null);
+    } else {
+      setBordaSelection('NONE');
+      // Auto-scroll para a próxima etapa
+      if (adicionalItems.length > 0) {
+        scrollToSection(adicionaisSectionRef);
+      } else {
+        scrollToSection(footerSectionRef);
+      }
     }
   };
 
@@ -167,10 +229,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const handleToggleAdicional = (adicional: Complement) => {
     const isSelected = selectedAdicionais.some(a => a.id === adicional.id);
     if (isSelected) {
-      // Remove o adicional
       setSelectedAdicionais(prev => prev.filter(a => a.id !== adicional.id));
     } else {
-      // Verifica limite de 3 adicionais
       if (selectedAdicionais.length >= 3) {
         return;
       }
@@ -190,17 +250,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     ? (selectedSecondFlavor ? (firstHalfPrice + secondHalfPrice) : product.price)
     : product.price;
 
-  const complementsTotal = (selectedBorda?.price || 0) + selectedAdicionais.reduce((acc, a) => acc + (a.price || 0), 0);
+  const bordaPrice = (bordaSelection && bordaSelection !== 'NONE') ? bordaSelection.price : 0;
+  const complementsTotal = bordaPrice + selectedAdicionais.reduce((acc, a) => acc + (a.price || 0), 0);
   const unitPrice = calculatedBasePrice + complementsTotal;
   const totalPrice = unitPrice * quantity;
 
   const canAddToCart = () => {
     if (!isStoreOpen || product.outOfStock) return false;
     if (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) return false;
+    if (!hasBordaDecision) return false;
     return true;
   };
 
   const handleConfirmAdd = () => {
+    if (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) {
+      scrollToSection(secondFlavorSectionRef);
+      return;
+    }
+    if (!hasBordaDecision) {
+      setBordaHighlightAlert(true);
+      scrollToSection(bordaSectionRef);
+      return;
+    }
     if (!canAddToCart()) return;
     
     onAdd(
@@ -213,7 +284,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         calculatedBasePrice
       } : undefined,
       {
-        selectedBorda: selectedBorda || undefined,
+        selectedBorda: effectiveBorda || undefined,
         selectedAdditionals: selectedAdicionais.length > 0 ? selectedAdicionais : undefined,
       }
     );
@@ -240,7 +311,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
           
           {/* Header & Description */}
           <div>
@@ -271,6 +342,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   onClick={() => {
                     setPizzaMode('INTEIRA');
                     setSelectedSecondFlavor(null);
+                    if (bordaItems.length > 0) {
+                      scrollToSection(bordaSectionRef);
+                    } else if (adicionalItems.length > 0) {
+                      scrollToSection(adicionaisSectionRef);
+                    } else {
+                      scrollToSection(footerSectionRef);
+                    }
                   }}
                   className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer ${
                     pizzaMode === 'INTEIRA'
@@ -298,7 +376,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 {/* Opção MEIO A MEIO */}
                 <button
                   type="button"
-                  onClick={() => setPizzaMode('MEIO_A_MEIO')}
+                  onClick={() => {
+                    setPizzaMode('MEIO_A_MEIO');
+                    scrollToSection(secondFlavorSectionRef);
+                  }}
                   className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer ${
                     pizzaMode === 'MEIO_A_MEIO'
                       ? 'border-amber-500 bg-amber-50/80 text-amber-950 shadow-sm ring-2 ring-amber-500/20'
@@ -327,7 +408,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
           {/* Se for MEIO A MEIO, abre a seleção do segundo sabor */}
           {isPizza && pizzaMode === 'MEIO_A_MEIO' && (
-            <div className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div ref={secondFlavorSectionRef} className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
               
               {/* 1º Sabor (Fixo da pizza aberta) */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
@@ -435,7 +516,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                             <button
                               type="button"
                               key={flavor.id}
-                              onClick={() => setSelectedSecondFlavor(flavor)}
+                              onClick={() => {
+                                setSelectedSecondFlavor(flavor);
+                                if (bordaItems.length > 0) {
+                                  scrollToSection(bordaSectionRef);
+                                } else if (adicionalItems.length > 0) {
+                                  scrollToSection(adicionaisSectionRef);
+                                } else {
+                                  scrollToSection(footerSectionRef);
+                                }
+                              }}
                               className="w-full p-2.5 rounded-xl text-left bg-white hover:bg-red-50 border border-slate-100 hover:border-red-200 transition-all flex items-center justify-between gap-3 group cursor-pointer shadow-xs"
                             >
                               <div className="flex items-center gap-3 min-w-0">
@@ -490,39 +580,63 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </div>
           )}
 
-          {/* Bordas Recheadas (Apenas 1 borda - ao escolher uma, as demais ficam desabilitadas) */}
+          {/* Bordas Recheadas (Escolha Obrigatória: 1 Borda Recheada OU SEM BORDA) */}
           {bordaItems.length > 0 && (
-            <div className="space-y-3 pt-4 border-t border-slate-100">
+            <div 
+              ref={bordaSectionRef} 
+              className={`space-y-3 pt-4 border-t border-slate-100 transition-all rounded-2xl ${
+                bordaHighlightAlert ? 'p-3.5 bg-amber-50/90 border-2 border-amber-400 ring-4 ring-amber-300/30' : ''
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
                     <span className="text-base">🥖</span>
-                    <span>Borda Recheada</span>
-                    <span className="text-[10px] bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-full uppercase">
-                      Apenas 1 Opção
-                    </span>
+                    <span>Borda da Pizza</span>
+                    {isBordaMandatory && (
+                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase transition-all ${
+                        bordaSelection === null
+                          ? 'bg-amber-500 text-white animate-pulse shadow-sm'
+                          : 'bg-emerald-100 text-emerald-900'
+                      }`}>
+                        {bordaSelection === null ? '⚠️ Escolha Obrigatória' : '✓ Escolhido'}
+                      </span>
+                    )}
                   </label>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    {selectedBorda 
-                      ? '✓ Borda escolhida. As outras foram desabilitadas automaticamente.' 
-                      : 'Opcional: selecione 1 borda recheada para a sua pizza.'}
+                    {bordaSelection === 'NONE'
+                      ? '✓ Opção escolhida: Massa tradicional sem recheio na borda.'
+                      : (bordaSelection && typeof bordaSelection === 'object')
+                      ? `✓ Borda "${bordaSelection.name}" selecionada. As demais foram desabilitadas.`
+                      : 'Escolha obrigatória: selecione 1 borda recheada ou marque "SEM BORDA" logo abaixo.'}
                   </p>
                 </div>
-                {selectedBorda && (
+                {bordaSelection !== null && (
                   <button
                     type="button"
-                    onClick={() => setSelectedBorda(null)}
-                    className="text-xs font-black text-red-600 hover:text-red-700 underline cursor-pointer"
+                    onClick={() => {
+                      setBordaSelection(null);
+                      setBordaHighlightAlert(false);
+                    }}
+                    className="text-xs font-black text-slate-500 hover:text-red-600 underline cursor-pointer"
                   >
-                    Remover borda
+                    Trocar escolha
                   </button>
                 )}
               </div>
 
+              {bordaHighlightAlert && (
+                <div className="bg-amber-100/90 border border-amber-300 text-amber-950 text-xs px-3.5 py-2.5 rounded-xl font-bold flex items-center gap-2 animate-bounce">
+                  <span>👉</span>
+                  <span>Por favor, selecione uma Borda Recheada ou clique em <strong>SEM BORDA</strong> para continuar!</span>
+                </div>
+              )}
+
+              {/* Opções de Bordas Recheadas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {bordaItems.map(borda => {
-                  const isSelected = selectedBorda?.id === borda.id;
-                  const isDisabled = Boolean(selectedBorda && !isSelected);
+                  const isSelected = bordaSelection !== 'NONE' && bordaSelection?.id === borda.id;
+                  const isDisabled = Boolean(bordaSelection !== null && !isSelected);
 
                   return (
                     <button 
@@ -570,12 +684,70 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   );
                 })}
               </div>
+
+              {/* Opção SEM BORDA (Logo abaixo das opções de borda) */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleSelectNoBorda}
+                  disabled={Boolean(bordaSelection !== null && bordaSelection !== 'NONE')}
+                  className={`w-full p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${
+                    bordaSelection === 'NONE'
+                      ? 'border-emerald-500 bg-emerald-50/90 text-emerald-950 shadow-md ring-2 ring-emerald-400/30 cursor-pointer'
+                      : (bordaSelection !== null && bordaSelection !== 'NONE')
+                      ? 'border-slate-100 bg-slate-50/60 text-slate-300 opacity-50 cursor-not-allowed select-none'
+                      : 'border-dashed border-slate-300 bg-slate-50/80 hover:border-emerald-400 hover:bg-emerald-50/40 text-slate-700 cursor-pointer'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 font-black transition-all ${
+                      bordaSelection === 'NONE'
+                        ? 'bg-emerald-600 text-white'
+                        : (bordaSelection !== null && bordaSelection !== 'NONE')
+                        ? 'border border-slate-200 text-transparent'
+                        : 'border border-slate-400 text-transparent'
+                    }`}>
+                      {bordaSelection === 'NONE' ? '✓' : ''}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-black text-xs sm:text-sm uppercase tracking-tight ${
+                          bordaSelection === 'NONE' ? 'text-emerald-950' : 'text-slate-800'
+                        }`}>
+                          SEM BORDA
+                        </span>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                          bordaSelection === 'NONE' ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          Tradicional
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        Massa tradicional artesanal da casa, sem recheio na borda.
+                      </p>
+                      {(bordaSelection !== null && bordaSelection !== 'NONE') && (
+                        <span className="text-[9px] font-bold text-slate-400 block mt-0.5">
+                          🔒 Desabilitado (Borda recheada já escolhida)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 pl-2">
+                    <span className={`font-black text-xs block ${
+                      bordaSelection === 'NONE' ? 'text-emerald-700' : 'text-slate-500'
+                    }`}>
+                      R$ 0,00
+                    </span>
+                    <span className="text-[9px] text-emerald-600 font-bold uppercase">Grátis</span>
+                  </div>
+                </button>
+              </div>
             </div>
           )}
 
           {/* Adicionais (Até no máximo 3 adicionais) */}
           {adicionalItems.length > 0 && (
-            <div className="space-y-3 pt-4 border-t border-slate-100">
+            <div ref={adicionaisSectionRef} className="space-y-3 pt-4 border-t border-slate-100">
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
@@ -665,7 +837,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         </div>
 
         {/* Bottom Bar: Quantity & Add Button */}
-        <div className="p-4 sm:p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-3 sm:gap-4 items-center shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
+        <div ref={footerSectionRef} className="p-4 sm:p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-3 sm:gap-4 items-center shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
           <div className="flex items-center gap-4 bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 w-full sm:w-auto justify-between sm:justify-start">
             <button 
               type="button"
@@ -690,7 +862,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             disabled={!canAddToCart()}
             className={`w-full sm:flex-1 py-4 px-6 rounded-2xl font-black uppercase text-sm tracking-widest text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer ${
               !canAddToCart()
-                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
+                ? (!hasBordaDecision)
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20 animate-pulse'
+                  : 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
                 : 'bg-red-600 hover:bg-red-700 shadow-red-900/20'
             }`}
           >
@@ -701,9 +875,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 ? 'Loja Fechada'
                 : (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor)
                 ? 'Escolha o 2º Sabor para Continuar'
+                : (isBordaMandatory && bordaSelection === null)
+                ? '⚠️ Escolha a Borda (ou Sem Borda)'
                 : (isPizza && pizzaMode === 'MEIO_A_MEIO')
                 ? `Adicionar Meio a Meio • R$ ${totalPrice.toFixed(2)}`
-                : `Adicionar Inteira • R$ ${totalPrice.toFixed(2)}`
+                : `Adicionar ao Pedido • R$ ${totalPrice.toFixed(2)}`
               }
             </span>
             {canAddToCart() && <span className="bg-white/20 px-2 py-0.5 rounded text-[10px]">➜</span>}

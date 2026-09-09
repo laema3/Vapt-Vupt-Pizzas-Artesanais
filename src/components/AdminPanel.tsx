@@ -7,6 +7,7 @@ import { writeBatch, doc } from 'firebase/firestore';
 import { PizzaPricingCalculator } from "./PizzaPricingCalculator.tsx";
 import { WeeklyPizzaSuggestions } from "./WeeklyPizzaSuggestions.tsx";
 import { Eye, EyeOff } from 'lucide-react';
+import { printOrderReceipt } from '../utils/printReceipt.ts';
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 const APP_VERSION = "v6.0 (Subcategorias & Import SQL)";
@@ -298,88 +299,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   };
 
   const handlePrintOrder = (order: Order) => {
-    const itemsHtml = order.items.map(item => `
-      <div class="item-row">
-        <span>${item.quantity}x ${item.name}</span>
-        <span>R$ ${(item.price * item.quantity).toFixed(2)}</span>
-      </div>
-      ${item.pizzaMode === 'MEIO_A_MEIO' && item.secondFlavor ? `<div style="font-size:10px; padding-left:10px; color:#555;">• 1/2 ${item.firstFlavor?.name || item.name} + 1/2 ${item.secondFlavor.name}</div>` : ''}
-      ${(item.selectedComplements || []).map(c => `<div style="font-size:10px; padding-left:10px; color:#555;">+ ${c.name}</div>`).join('')}
-    `).join('');
-
-    const printContent = `
-      <html>
-      <head>
-        <title>Cupom #${order.id.substring(0, 5)}</title>
-        <style>
-          body { margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; background: #fff; color: #000; font-weight: 600; }
-          .coupon-content { width: 300px; margin: 0 auto; padding: 10px; font-size: 13px; line-height: 1.3; }
-          .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-          .header h1 { font-size: 18px; font-weight: 900; margin: 0; }
-          .header h2 { font-size: 16px; font-weight: 800; margin: 5px 0; }
-          .info { border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; font-weight: 700; }
-          .items { border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; font-weight: 700; }
-          .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-          .totals { font-size: 14px; font-weight: 700; }
-          .totals p { margin: 2px 0; display: flex; justify-content: space-between; }
-          .total-final { font-size: 18px; font-weight: 900; margin-top: 10px; border-top: 2px solid #000; padding-top: 5px; display: flex; justify-content: space-between; }
-          .footer { text-align: center; font-size: 11px; margin-top: 20px; font-weight: 700; }
-          @media print { @page { margin: 0; } body { margin: 0; } }
-        </style>
-      </head>
-      <body>
-        <div class="coupon-content">
-          <div class="header">
-            <h1>${storeName || 'BELLA BORDA'}</h1>
-            <h2>Pedido #${order.id.substring(0,5)}</h2>
-            <p>${new Date(order.createdAt).toLocaleString('pt-BR')}</p>
-          </div>
-          <div class="info">
-            <p><strong>Cli:</strong> ${order.customerName}</p>
-            <p><strong>Tel:</strong> ${order.customerPhone}</p>
-            <p><strong>Status:</strong> ${order.status}</p>
-            <p><strong>Pag:</strong> ${order.paymentMethod}</p>
-            ${order.changeFor ? `<p><strong>Troco p/:</strong> R$ ${order.changeFor.toFixed(2)}</p>` : ''}
-            ${order.deliveryType === 'DELIVERY' ? `<p><strong>End:</strong> ${order.customerAddress}</p>` : (order.deliveryType === 'TABLE' ? `<p><strong>${order.customerAddress}</strong></p>` : '<p><strong>RETIRADA NO BALCÃO</strong></p>')}
-             ${order.couponCode ? `<p><strong>Cupom:</strong> ${order.couponCode}</p>` : ''}
-          </div>
-          <div class="items">${itemsHtml}</div>
-          <div class="totals">
-            <p><span>Subtotal:</span> <span>R$ ${(order.total - order.deliveryFee + (order.discountValue || 0)).toFixed(2)}</span></p>
-            ${order.deliveryFee > 0 ? `<p><span>Taxa Entrega:</span> <span>R$ ${order.deliveryFee.toFixed(2)}</span></p>` : ''}
-            ${order.discountValue ? `<p><span>Desconto:</span> <span>- R$ ${order.discountValue.toFixed(2)}</span></p>` : ''}
-            <div class="total-final">
-              <span>TOTAL:</span>
-              <span>R$ ${order.total.toFixed(2)}</span>
-            </div>
-            ${order.changeFor ? `<p>Troco: R$ ${(order.changeFor - order.total).toFixed(2)}</p>` : ''}
-          </div>
-          <div class="footer">
-            <p>Obrigado pela preferência!</p>
-            <p>CNPJ: 64.412.248/0001-42 - ${storeName || 'BELLA BORDA PIZZARIA'} LTDA</p>
-            <p>AV. LUCAS BORGES, 586 - FABRÍCIO</p>
-            <p>UBERABA - MG - FONE: 34-9-9262-7077</p>
-            <p>IE: 53999960035</p>
-            <p>www.bellaborda.com.br</p>
-          </div>
-        </div>
-        <script>
-          window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); }
-        </script>
-      </body>
-      </html>
-    `;
-
-    try {
-        const printWindow = window.open('', '_blank', 'width=350,height=600,menubar=no,toolbar=no,location=no,status=no,titlebar=no');
-        if (printWindow) {
-            printWindow.document.open();
-            printWindow.document.write(printContent);
-            printWindow.document.close();
-        }
-    } catch (e) {
-        console.error("Print error:", e);
-    }
+    printOrderReceipt(order, storeName, socialLinks);
   };
 
   const handleRightSidebarClick = (status: OrderStatus | 'TODOS') => {

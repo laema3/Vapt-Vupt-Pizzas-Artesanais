@@ -1320,6 +1320,8 @@ const App: React.FC = () => {
                   onBack={() => setActiveView('home')} 
                   onReorder={() => {}} 
                   defaultEstimatedMinutes={socialLinks.orderEstimatedMinutes || 30}
+                  storeName={storeName}
+                  socialLinks={socialLinks}
                 />
               );
             })()}
@@ -1559,6 +1561,8 @@ const App: React.FC = () => {
         tables={tables} 
         defaultEstimatedMinutes={socialLinks.orderEstimatedMinutes || 30}
         onViewMyOrders={() => setActiveView('my-orders')}
+        storeName={storeName}
+        socialLinks={socialLinks}
         onSendWhatsApp={() => {
         if (!lastOrder) return;
         const phone = (socialLinks.whatsapp || '5534991183728').replace(/\D/g, '');

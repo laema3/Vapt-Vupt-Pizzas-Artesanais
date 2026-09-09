@@ -3,6 +3,7 @@ import React from 'react';
 import { Order, Table } from '../types';
 import { formatOrderNumber } from '../utils/format';
 import { OrderCountdownTimer } from './OrderCountdownTimer';
+import { printOrderReceipt } from '../utils/printReceipt';
 
 interface OrderSuccessModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ interface OrderSuccessModalProps {
   tables: Table[];
   defaultEstimatedMinutes?: number;
   onViewMyOrders?: () => void;
+  storeName?: string;
+  socialLinks?: any;
 }
 
 export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ 
@@ -23,7 +26,9 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
   isKioskMode, 
   tables,
   defaultEstimatedMinutes = 30,
-  onViewMyOrders
+  onViewMyOrders,
+  storeName,
+  socialLinks
 }) => {
   if (!isOpen || !order) return null;
 
@@ -79,6 +84,14 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
         </div>
         
         <div className="space-y-2">
+          <button 
+            onClick={() => printOrderReceipt(order, storeName, socialLinks)} 
+            className="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-black uppercase text-xs sm:text-sm tracking-wider hover:bg-black transition-colors shadow-lg shadow-slate-900/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>Imprimir Cupom / Pedido</span>
+            <span>🖨️</span>
+          </button>
+
           {!isKioskMode && (
             <button 
               onClick={onSendWhatsApp} 

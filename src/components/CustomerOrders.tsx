@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { formatOrderNumber } from '../utils/format';
 import { OrderCountdownTimer } from './OrderCountdownTimer';
+import { printOrderReceipt } from '../utils/printReceipt';
 
 const MapUpdater = ({ center }: { center: [number, number] }) => {
   const map = useMap();
@@ -20,9 +21,11 @@ interface CustomerOrdersProps {
   onBack: () => void;
   onReorder: (order: Order) => void;
   defaultEstimatedMinutes?: number;
+  storeName?: string;
+  socialLinks?: any;
 }
 
-export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, onReorder, defaultEstimatedMinutes = 30 }) => {
+export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, onReorder, defaultEstimatedMinutes = 30, storeName, socialLinks }) => {
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
 
   useEffect(() => {
@@ -122,7 +125,11 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, 
                 ))}
               </div>
 
-              <div className="flex justify-end gap-4">
+              <div className="flex flex-wrap justify-end gap-3">
+                <button onClick={() => printOrderReceipt(order, storeName, socialLinks)} className="bg-slate-100 text-slate-700 border border-slate-200 px-4 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-colors flex items-center gap-1.5 active:scale-95" title="Imprimir Cupom">
+                  <span>Imprimir Cupom</span>
+                  <span>🖨️</span>
+                </button>
                 {order.status === 'SAIU PARA ENTREGA' && order.currentLocation && (
                   <button onClick={() => setTrackingOrder(order)} className="bg-purple-600 text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-purple-700 transition-colors shadow-lg shadow-purple-900/20 active:scale-95">
                     Acompanhar Entrega 📍

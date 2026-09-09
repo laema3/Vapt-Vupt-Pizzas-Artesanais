@@ -248,18 +248,38 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       </div>
                     )}
 
-                    {/* Adicionais / Bordas */}
-                    {item.selectedComplements && item.selectedComplements.length > 0 && (
-                      <div className="mb-2 bg-slate-100/70 rounded-lg px-2 py-1 text-[10px] text-slate-600 space-y-0.5">
-                        <span className="font-bold text-slate-700">Adicionais:</span>
-                        {item.selectedComplements.map((c, ci) => (
-                          <div key={ci} className="pl-2 flex justify-between">
-                            <span>+ {c.name}</span>
-                            <span className="font-bold text-slate-500">R$ {c.price.toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {/* Adicionais & Borda Recheada */}
+                    {item.selectedComplements && item.selectedComplements.length > 0 && (() => {
+                      const borda = item.selectedBorda || item.selectedComplements.find(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda'));
+                      const adicionais = item.selectedAdditionals || item.selectedComplements.filter(c => c !== borda);
+
+                      return (
+                        <div className="mb-2 bg-slate-100/80 rounded-xl p-2 text-[10px] text-slate-700 space-y-1.5 border border-slate-200/60">
+                          {borda && (
+                            <div className="bg-amber-50/90 border border-amber-200/80 rounded-lg p-1.5 text-amber-950 flex justify-between items-center">
+                              <span className="font-black flex items-center gap-1">
+                                <span>🥖</span> <span>Borda: {borda.name}</span>
+                              </span>
+                              <span className="font-black text-amber-700">+ R$ {borda.price.toFixed(2)}</span>
+                            </div>
+                          )}
+
+                          {adicionais.length > 0 && (
+                            <div className="space-y-0.5">
+                              <span className="font-black text-slate-500 uppercase text-[9px] block">
+                                ➕ Adicionais ({adicionais.length}/3):
+                              </span>
+                              {adicionais.map((c, ci) => (
+                                <div key={ci} className="pl-1 flex justify-between items-center text-slate-600">
+                                  <span>• {c.name}</span>
+                                  <span className="font-bold text-slate-700">+ R$ {c.price.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <p className="text-red-600 font-black text-xs mb-2">
                       R$ {item.price.toFixed(2)} {item.quantity > 1 ? `(Total: R$ ${(item.price * item.quantity).toFixed(2)})` : ''}

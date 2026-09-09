@@ -31,6 +31,7 @@ export interface Complement {
   price: number; 
   active: boolean; 
   applicable_categories?: string[]; 
+  type?: 'BORDA' | 'ADICIONAL';
 }
 
 export interface CartFlavorInfo {
@@ -47,6 +48,8 @@ export interface CartItem extends Product {
   pizzaMode?: 'INTEIRA' | 'MEIO_A_MEIO';
   firstFlavor?: CartFlavorInfo;
   secondFlavor?: CartFlavorInfo;
+  selectedBorda?: Complement;
+  selectedAdditionals?: Complement[];
 }
 
 export type OrderStatus = 'NOVO' | 'PREPARANDO' | 'PRONTO PARA RETIRADA' | 'SAIU PARA ENTREGA' | 'FINALIZADO' | 'CANCELADO' | 'AGUARDANDO PAGAMENTO';

@@ -15,6 +15,10 @@ interface ProductModalProps {
       mode: 'INTEIRA' | 'MEIO_A_MEIO';
       secondFlavor?: Product;
       calculatedBasePrice: number;
+    },
+    extraOptions?: {
+      selectedBorda?: Complement;
+      selectedAdditionals?: Complement[];
     }
   ) => void;
   isStoreOpen: boolean;
@@ -32,7 +36,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   logoUrl 
 }) => {
   const [quantity, setQuantity] = useState(1);
-  const [selectedComplements, setSelectedComplements] = useState<Complement[]>([]);
+  const [selectedBorda, setSelectedBorda] = useState<Complement | null>(null);
+  const [selectedAdicionais, setSelectedAdicionais] = useState<Complement[]>([]);
   const [pizzaMode, setPizzaMode] = useState<'INTEIRA' | 'MEIO_A_MEIO'>('INTEIRA');
   const [selectedSecondFlavor, setSelectedSecondFlavor] = useState<Product | null>(null);
   const [flavorSearch, setFlavorSearch] = useState('');
@@ -40,7 +45,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   useEffect(() => {
     if (product) {
       setQuantity(1);
-      setSelectedComplements([]);
+      setSelectedBorda(null);
+      setSelectedAdicionais([]);
       setPizzaMode('INTEIRA');
       setSelectedSecondFlavor(null);
       setFlavorSearch('');
@@ -73,6 +79,47 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     return true;
   }, [product, categories]);
 
+  // Separar Bordas e Adicionais aplicáveis
+  const applicableComplements = useMemo(() => {
+    if (!product || !complements) return [];
+    return complements.filter(c => 
+      c.active && (!c.applicable_categories || c.applicable_categories.length === 0 || c.applicable_categories.includes(product.category))
+    );
+  }, [product, complements]);
+
+  const bordaItems = useMemo(() => {
+    const list = applicableComplements.filter(c => 
+      c.type === 'BORDA' || c.name.toLowerCase().includes('borda')
+    );
+    // Se for pizza e não houver bordas cadastradas no banco, fornece opções padrão de borda
+    if (list.length === 0 && isPizza) {
+      return [
+        { id: 'borda_catupiry_padrao', name: 'Borda Catupiry Tradicional', price: 12.00, active: true, type: 'BORDA' as const },
+        { id: 'borda_cheddar_padrao', name: 'Borda Cheddar Cremoso', price: 10.00, active: true, type: 'BORDA' as const },
+        { id: 'borda_chocolate_padrao', name: 'Borda Chocolate ao Leite', price: 14.00, active: true, type: 'BORDA' as const },
+        { id: 'borda_creamcheese_padrao', name: 'Borda Cream Cheese', price: 13.00, active: true, type: 'BORDA' as const },
+      ];
+    }
+    return list;
+  }, [applicableComplements, isPizza]);
+
+  const adicionalItems = useMemo(() => {
+    const list = applicableComplements.filter(c => 
+      c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')
+    );
+    // Se for pizza e não houver adicionais cadastrados no banco, fornece opções padrão
+    if (list.length === 0 && isPizza) {
+      return [
+        { id: 'adic_bacon_padrao', name: 'Bacon em Cubos', price: 6.00, active: true, type: 'ADICIONAL' as const },
+        { id: 'adic_mussarela_padrao', name: 'Mussarela Extra', price: 7.00, active: true, type: 'ADICIONAL' as const },
+        { id: 'adic_milho_padrao', name: 'Milho Verde', price: 3.50, active: true, type: 'ADICIONAL' as const },
+        { id: 'adic_palmito_padrao', name: 'Palmito Picado', price: 5.50, active: true, type: 'ADICIONAL' as const },
+        { id: 'adic_cebola_padrao', name: 'Cebola Crispy', price: 4.00, active: true, type: 'ADICIONAL' as const },
+      ];
+    }
+    return list;
+  }, [applicableComplements, isPizza]);
+
   // Lista de outros sabores de pizza disponíveis para a segunda metade
   const availableSecondFlavors = useMemo(() => {
     if (!product || !allProducts || allProducts.length === 0) return [];
@@ -97,15 +144,41 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     });
   }, [product, allProducts, flavorSearch]);
 
-  if (!product) return null;
+  // Lista combinada de complementos para salvar no pedido
+  const selectedComplements = useMemo(() => {
+    return [
+      ...(selectedBorda ? [selectedBorda] : []),
+      ...selectedAdicionais
+    ];
+  }, [selectedBorda, selectedAdicionais]);
 
-  const handleToggleComplement = (comp: Complement) => {
-    if (selectedComplements.find(c => c.id === comp.id)) {
-      setSelectedComplements(prev => prev.filter(c => c.id !== comp.id));
+  // Seleção de Borda: Apenas 1 borda. Ao escolher uma, as demais ficam desabilitadas.
+  const handleSelectBorda = (borda: Complement) => {
+    if (selectedBorda?.id === borda.id) {
+      // Se já clicou na mesma, desseleciona
+      setSelectedBorda(null);
     } else {
-      setSelectedComplements(prev => [...prev, comp]);
+      // Seleciona a borda escolhida
+      setSelectedBorda(borda);
     }
   };
+
+  // Seleção de Adicionais: Até no máximo 3 adicionais.
+  const handleToggleAdicional = (adicional: Complement) => {
+    const isSelected = selectedAdicionais.some(a => a.id === adicional.id);
+    if (isSelected) {
+      // Remove o adicional
+      setSelectedAdicionais(prev => prev.filter(a => a.id !== adicional.id));
+    } else {
+      // Verifica limite de 3 adicionais
+      if (selectedAdicionais.length >= 3) {
+        return;
+      }
+      setSelectedAdicionais(prev => [...prev, adicional]);
+    }
+  };
+
+  if (!product) return null;
 
   // Metade da primeira pizza
   const firstHalfPrice = product.price / 2;
@@ -117,7 +190,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     ? (selectedSecondFlavor ? (firstHalfPrice + secondHalfPrice) : product.price)
     : product.price;
 
-  const complementsTotal = selectedComplements.reduce((acc, c) => acc + (c.price || 0), 0);
+  const complementsTotal = (selectedBorda?.price || 0) + selectedAdicionais.reduce((acc, a) => acc + (a.price || 0), 0);
   const unitPrice = calculatedBasePrice + complementsTotal;
   const totalPrice = unitPrice * quantity;
 
@@ -138,7 +211,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         mode: pizzaMode,
         secondFlavor: selectedSecondFlavor || undefined,
         calculatedBasePrice
-      } : undefined
+      } : undefined,
+      {
+        selectedBorda: selectedBorda || undefined,
+        selectedAdditionals: selectedAdicionais.length > 0 ? selectedAdicionais : undefined,
+      }
     );
     onClose();
   };
@@ -413,28 +490,175 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </div>
           )}
 
-          {/* Adicionais / Bordas recheadas */}
-          {complements.length > 0 && (
-            <div className="space-y-4 pt-4 border-t border-slate-100">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                Adicionais & Bordas
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {complements.filter(c => c.active && (!c.applicable_categories || c.applicable_categories.includes(product.category))).map(comp => (
-                  <button 
+          {/* Bordas Recheadas (Apenas 1 borda - ao escolher uma, as demais ficam desabilitadas) */}
+          {bordaItems.length > 0 && (
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <span className="text-base">🥖</span>
+                    <span>Borda Recheada</span>
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-full uppercase">
+                      Apenas 1 Opção
+                    </span>
+                  </label>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {selectedBorda 
+                      ? '✓ Borda escolhida. As outras foram desabilitadas automaticamente.' 
+                      : 'Opcional: selecione 1 borda recheada para a sua pizza.'}
+                  </p>
+                </div>
+                {selectedBorda && (
+                  <button
                     type="button"
-                    key={comp.id}
-                    onClick={() => handleToggleComplement(comp)}
-                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${
-                      selectedComplements.find(c => c.id === comp.id) 
-                        ? 'border-red-500 bg-red-50 text-red-800 shadow-md' 
-                        : 'border-slate-100 bg-white text-slate-600 hover:border-red-200 hover:bg-slate-50'
-                    }`}
+                    onClick={() => setSelectedBorda(null)}
+                    className="text-xs font-black text-red-600 hover:text-red-700 underline cursor-pointer"
                   >
-                    <span className="font-bold text-xs uppercase tracking-wide">{comp.name}</span>
-                    <span className="font-black text-xs text-red-600">+ R$ {comp.price.toFixed(2)}</span>
+                    Remover borda
                   </button>
-                ))}
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {bordaItems.map(borda => {
+                  const isSelected = selectedBorda?.id === borda.id;
+                  const isDisabled = Boolean(selectedBorda && !isSelected);
+
+                  return (
+                    <button 
+                      type="button"
+                      key={borda.id}
+                      disabled={isDisabled}
+                      onClick={() => handleSelectBorda(borda)}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all text-left ${
+                        isSelected 
+                          ? 'border-amber-500 bg-amber-50/90 text-amber-950 shadow-md ring-2 ring-amber-400/30 cursor-pointer' 
+                          : isDisabled
+                          ? 'border-slate-100 bg-slate-50/70 text-slate-300 opacity-50 cursor-not-allowed select-none'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:bg-amber-50/30 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 font-black transition-all ${
+                          isSelected 
+                            ? 'bg-amber-500 text-white' 
+                            : isDisabled 
+                            ? 'border border-slate-200 text-transparent' 
+                            : 'border border-slate-300 text-transparent'
+                        }`}>
+                          {isSelected ? '✓' : ''}
+                        </span>
+                        <div className="min-w-0">
+                          <span className={`font-bold text-xs uppercase tracking-tight block truncate ${
+                            isSelected ? 'text-amber-950' : isDisabled ? 'text-slate-400' : 'text-slate-800'
+                          }`}>
+                            {borda.name}
+                          </span>
+                          {isDisabled && (
+                            <span className="text-[9px] font-bold text-slate-400 block">
+                              🔒 Desabilitada (1 já escolhida)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`font-black text-xs shrink-0 pl-2 ${
+                        isSelected ? 'text-amber-700' : isDisabled ? 'text-slate-300' : 'text-slate-900'
+                      }`}>
+                        + R$ {borda.price.toFixed(2)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Adicionais (Até no máximo 3 adicionais) */}
+          {adicionalItems.length > 0 && (
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <span className="text-base">➕</span>
+                    <span>Adicionais</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                      selectedAdicionais.length === 3
+                        ? 'bg-red-100 text-red-700'
+                        : selectedAdicionais.length > 0
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {selectedAdicionais.length}/3 Escolhidos
+                    </span>
+                  </label>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {selectedAdicionais.length === 3 
+                      ? '⚠️ Limite de 3 adicionais atingido. Desmarque um para escolher outro.' 
+                      : 'Escolha até no máximo 3 adicionais opcionais.'}
+                  </p>
+                </div>
+                {selectedAdicionais.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAdicionais([])}
+                    className="text-xs font-black text-red-600 hover:text-red-700 underline cursor-pointer"
+                  >
+                    Limpar adicionais
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {adicionalItems.map(adic => {
+                  const isSelected = selectedAdicionais.some(a => a.id === adic.id);
+                  const isMaxReached = selectedAdicionais.length >= 3;
+                  const isDisabled = isMaxReached && !isSelected;
+
+                  return (
+                    <button 
+                      type="button"
+                      key={adic.id}
+                      disabled={isDisabled}
+                      onClick={() => handleToggleAdicional(adic)}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all text-left ${
+                        isSelected 
+                          ? 'border-red-500 bg-red-50/90 text-red-900 shadow-sm ring-2 ring-red-400/20 cursor-pointer' 
+                          : isDisabled
+                          ? 'border-slate-100 bg-slate-50/70 text-slate-300 opacity-50 cursor-not-allowed select-none'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-slate-50 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs shrink-0 font-black transition-all ${
+                          isSelected 
+                            ? 'bg-red-600 text-white' 
+                            : isDisabled 
+                            ? 'border border-slate-200 text-transparent' 
+                            : 'border border-slate-300 text-transparent'
+                        }`}>
+                          {isSelected ? '✓' : ''}
+                        </span>
+                        <div className="min-w-0">
+                          <span className={`font-bold text-xs uppercase tracking-tight block truncate ${
+                            isSelected ? 'text-red-950' : isDisabled ? 'text-slate-400' : 'text-slate-800'
+                          }`}>
+                            {adic.name}
+                          </span>
+                          {isDisabled && (
+                            <span className="text-[9px] font-bold text-slate-400 block">
+                              🔒 Limite de 3 atingido
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`font-black text-xs shrink-0 pl-2 ${
+                        isSelected ? 'text-red-600' : isDisabled ? 'text-slate-300' : 'text-slate-700'
+                      }`}>
+                        + R$ {adic.price.toFixed(2)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

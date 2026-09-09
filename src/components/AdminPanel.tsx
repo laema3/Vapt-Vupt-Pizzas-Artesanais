@@ -91,8 +91,8 @@ interface AdminPanelProps {
   onAddSubCategory: (catId: string, name: string) => void;
   onUpdateSubCategory: (id: string, name: string, categoryId: string) => void;
   onRemoveSubCategory: (id: string) => Promise<void>;
-  onAddComplement: (name: string, price: number, applicableCategories?: string[]) => void;
-  onUpdateComplement: (id: string, name: string, price: number, applicableCategories?: string[]) => void;
+  onAddComplement: (name: string, price: number, applicableCategories?: string[], type?: 'BORDA' | 'ADICIONAL') => void;
+  onUpdateComplement: (id: string, name: string, price: number, applicableCategories?: string[], type?: 'BORDA' | 'ADICIONAL') => void;
   onToggleComplement: (id: string) => void;
   onRemoveComplement: (id: string) => Promise<void>;
   onAddZipRange: (start: string, end: string, fee: number) => void;
@@ -110,7 +110,7 @@ interface AdminPanelProps {
   onWaiterMode?: () => void;
 }
 
-type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'ajustes';
+type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'ajustes';
 
 type DeleteTarget = {
   type: 'ORDER' | 'PRODUCT' | 'CATEGORY' | 'SUBCATEGORY' | 'COMPLEMENT' | 'COUPON' | 'ZIP' | 'PAYMENT' | 'TABLE';
@@ -161,6 +161,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [editingSubCatId, setEditingSubCatId] = useState<string | null>(null);
   const [subCatName, setSubCatName] = useState('');
   const [subCatParent, setSubCatParent] = useState('');
+
+  const [bordaName, setBordaName] = useState('');
+  const [bordaPrice, setBordaPrice] = useState<number>(0);
 
   const [compName, setCompName] = useState('');
   const [compPrice, setCompPrice] = useState<number>(0);
@@ -616,6 +619,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           <NavItem active={activeView === 'produtos'} icon="🍔" label="Produtos" onClick={() => setActiveView('produtos')} />
           <NavItem active={activeView === 'categorias'} icon="📁" label="Categorias" onClick={() => setActiveView('categorias')} />
           <NavItem active={activeView === 'subcategorias'} icon="🌿" label="Subcategorias" onClick={() => setActiveView('subcategorias')} />
+          <NavItem active={activeView === 'bordas'} icon="🥖" label="Bordas" onClick={() => setActiveView('bordas')} />
           <NavItem active={activeView === 'adicionais'} icon="➕" label="Adicionais" onClick={() => setActiveView('adicionais')} />
           
           <div className="pt-6 pb-2 px-4 text-xs font-black text-slate-600 uppercase tracking-widest">Gestão</div>
@@ -985,35 +989,273 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                </div>
             )}
 
+            {activeView === 'bordas' && (
+               <div className="space-y-8 animate-in fade-in">
+                  {/* Banner explicativo com a regra */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                     <div className="flex items-start gap-4">
+                        <span className="text-3xl p-2 bg-amber-100 rounded-2xl">🥖</span>
+                        <div>
+                           <h4 className="font-black text-amber-950 text-base uppercase tracking-wide">
+                              Bordas Recheadas com Valores
+                           </h4>
+                           <p className="text-xs text-amber-900 font-medium mt-1 leading-relaxed max-w-2xl">
+                              <strong>Regra do Sistema:</strong> Quando o cliente estiver montando a pizza, ele poderá escolher 
+                              <strong> apenas 1 borda</strong>. Sempre que ele escolher uma borda, 
+                              <strong> todas as outras ficam desabilitadas automaticamente</strong>.
+                           </p>
+                        </div>
+                     </div>
+                     <button
+                        type="button"
+                        onClick={() => {
+                           const suggested = [
+                              { name: 'Borda Recheada de Catupiry', price: 12.00 },
+                              { name: 'Borda Recheada de Cheddar', price: 10.00 },
+                              { name: 'Borda Recheada de Chocolate ao Leite', price: 14.00 },
+                              { name: 'Borda Recheada de Cream Cheese', price: 13.00 },
+                           ];
+                           suggested.forEach(b => {
+                              const exists = complements.some(c => c.name.toLowerCase() === b.name.toLowerCase());
+                              if (!exists) {
+                                 onAddComplement(b.name, b.price, [], 'BORDA');
+                              }
+                           });
+                        }}
+                        className="text-xs font-black bg-amber-200 hover:bg-amber-300 text-amber-950 px-4 py-3 rounded-2xl whitespace-nowrap transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                     >
+                        <span>✨</span>
+                        <span>Carregar Bordas Sugeridas</span>
+                     </button>
+                  </div>
+
+                  {/* Formulário de Nova Borda */}
+                  <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
+                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                        <span>🥖</span>
+                        <span>Cadastrar Nova Borda</span>
+                     </h3>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div className="space-y-1">
+                           <label className={labelClass}>Nome da Borda Recheada</label>
+                           <input 
+                              value={bordaName} 
+                              onChange={e => setBordaName(e.target.value)} 
+                              placeholder="Ex: Borda Catupiry, Borda Cheddar" 
+                              className={inputClass} 
+                           />
+                        </div>
+                        <div className="space-y-1">
+                           <label className={labelClass}>Valor Adicional (+ R$)</label>
+                           <input 
+                              type="number" 
+                              step="0.50"
+                              value={bordaPrice || ''} 
+                              onChange={e => setBordaPrice(Number(e.target.value))} 
+                              placeholder="12.00" 
+                              className={inputClass} 
+                           />
+                        </div>
+                        <button 
+                           onClick={() => { 
+                              if (!bordaName.trim()) return;
+                              onAddComplement(bordaName.trim(), bordaPrice, [], 'BORDA'); 
+                              setBordaName(''); 
+                              setBordaPrice(0); 
+                           }} 
+                           className={buttonClass}
+                        >
+                           Cadastrar Borda
+                        </button>
+                     </div>
+                  </div>
+
+                  {/* Lista de Bordas Cadastradas */}
+                  <div>
+                     <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">
+                           Bordas Disponíveis ({complements.filter(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda')).length})
+                        </h4>
+                        <span className="text-xs text-slate-400 font-semibold">
+                           Apenas 1 borda pode ser selecionada pelo cliente por pizza
+                        </span>
+                     </div>
+
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {complements.filter(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda')).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                           <div key={c.id} className="bg-white p-5 rounded-2xl border border-amber-200/80 shadow-sm flex justify-between items-center hover:border-amber-400 transition-all">
+                              <div className="min-w-0 pr-3">
+                                 <div className="flex items-center gap-1.5">
+                                    <span className="text-sm">🥖</span>
+                                    <span className="font-bold text-slate-800 uppercase text-sm truncate block">{c.name}</span>
+                                 </div>
+                                 <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-amber-700 font-black uppercase">+ R$ {c.price.toFixed(2)}</span>
+                                    <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Exclusiva</span>
+                                 </div>
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                 <button 
+                                    onClick={() => onToggleComplement(c.id)} 
+                                    className={`text-xs font-black px-3 py-1.5 rounded-lg transition-all ${
+                                       c.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400'
+                                    }`}
+                                 >
+                                    {c.active ? 'Ativa' : 'Inativa'}
+                                 </button>
+                                 <button 
+                                    onClick={() => requestDelete('COMPLEMENT', c.id, c.name)} 
+                                    className="text-red-500 text-xs font-black hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all"
+                                 >
+                                    Excluir
+                                 </button>
+                              </div>
+                           </div>
+                        ))}
+                        {complements.filter(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda')).length === 0 && (
+                           <div className="col-span-full bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-8 text-center text-slate-400 space-y-2">
+                              <span className="text-3xl block">🥖</span>
+                              <p className="text-sm font-bold text-slate-600">Nenhuma borda cadastrada ainda no banco.</p>
+                              <p className="text-xs">Cadastre suas bordas com valores acima ou clique em "Carregar Bordas Sugeridas".</p>
+                           </div>
+                        )}
+                     </div>
+                  </div>
+               </div>
+            )}
+
             {activeView === 'adicionais' && (
                <div className="space-y-8 animate-in fade-in">
+                  {/* Banner explicativo com a regra */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                     <div className="flex items-start gap-4">
+                        <span className="text-3xl p-2 bg-emerald-100 rounded-2xl">➕</span>
+                        <div>
+                           <h4 className="font-black text-emerald-950 text-base uppercase tracking-wide">
+                              Adicionais do Cardápio
+                           </h4>
+                           <p className="text-xs text-emerald-900 font-medium mt-1 leading-relaxed max-w-2xl">
+                              <strong>Regra do Sistema:</strong> O cliente pode escolher 
+                              <strong> até no máximo 3 adicionais</strong> por produto. Ao selecionar 3 adicionais, 
+                              os demais ficam bloqueados até que desmarque algum.
+                           </p>
+                        </div>
+                     </div>
+                     <button
+                        type="button"
+                        onClick={() => {
+                           const suggested = [
+                              { name: 'Bacon em Cubos', price: 6.00 },
+                              { name: 'Mussarela Extra', price: 7.00 },
+                              { name: 'Milho Verde', price: 3.50 },
+                              { name: 'Palmito Picado', price: 5.50 },
+                              { name: 'Cebola Crispy', price: 4.00 },
+                           ];
+                           suggested.forEach(a => {
+                              const exists = complements.some(c => c.name.toLowerCase() === a.name.toLowerCase());
+                              if (!exists) {
+                                 onAddComplement(a.name, a.price, [], 'ADICIONAL');
+                              }
+                           });
+                        }}
+                        className="text-xs font-black bg-emerald-200 hover:bg-emerald-300 text-emerald-950 px-4 py-3 rounded-2xl whitespace-nowrap transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                     >
+                        <span>✨</span>
+                        <span>Carregar Adicionais Sugeridos</span>
+                     </button>
+                  </div>
+
+                  {/* Formulário de Novo Adicional */}
                   <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest">➕ Novo Adicional</h3>
+                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                        <span>➕</span>
+                        <span>Cadastrar Novo Adicional</span>
+                     </h3>
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div className="space-y-1">
                            <label className={labelClass}>Nome do Adicional</label>
-                           <input value={compName} onChange={e => setCompName(e.target.value)} placeholder="Ex: Bacon, Cheddar" className={inputClass} />
+                           <input 
+                              value={compName} 
+                              onChange={e => setCompName(e.target.value)} 
+                              placeholder="Ex: Bacon em Cubos, Queijo Extra" 
+                              className={inputClass} 
+                           />
                         </div>
                         <div className="space-y-1">
-                           <label className={labelClass}>Preço (+R$)</label>
-                           <input type="number" value={compPrice || ''} onChange={e => setCompPrice(Number(e.target.value))} placeholder="0.00" className={inputClass} />
+                           <label className={labelClass}>Valor Adicional (+ R$)</label>
+                           <input 
+                              type="number" 
+                              step="0.50"
+                              value={compPrice || ''} 
+                              onChange={e => setCompPrice(Number(e.target.value))} 
+                              placeholder="0.00" 
+                              className={inputClass} 
+                           />
                         </div>
-                        <button onClick={() => { onAddComplement(compName, compPrice, []); setCompName(''); setCompPrice(0); }} className={buttonClass}>Adicionar</button>
+                        <button 
+                           onClick={() => { 
+                              if (!compName.trim()) return;
+                              onAddComplement(compName.trim(), compPrice, [], 'ADICIONAL'); 
+                              setCompName(''); 
+                              setCompPrice(0); 
+                           }} 
+                           className={buttonClass}
+                        >
+                           Cadastrar Adicional
+                        </button>
                      </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                     {[...complements].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
-                       <div key={c.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
-                          <div>
-                            <span className="font-bold text-slate-700 uppercase text-sm block">{c.name}</span>
-                            <span className="text-[10px] text-red-600 font-black uppercase">+ R$ {c.price.toFixed(2)}</span>
-                          </div>
-                          <div className="flex gap-2">
-                             <button onClick={() => onToggleComplement(c.id)} className={`text-xs font-black px-3 py-1.5 rounded-lg ${c.active ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-400'}`}>{c.active ? 'Ativo' : 'Inativo'}</button>
-                             <button onClick={() => requestDelete('COMPLEMENT', c.id, c.name)} className="text-red-500 text-xs font-black hover:bg-red-50 px-3 py-1.5 rounded-lg">Excluir</button>
-                          </div>
-                       </div>
-                     ))}
+
+                  {/* Lista de Adicionais Cadastrados */}
+                  <div>
+                     <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">
+                           Adicionais Disponíveis ({complements.filter(c => c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')).length})
+                        </h4>
+                        <span className="text-xs text-slate-400 font-semibold">
+                           Limite de até 3 adicionais por item escolhido
+                        </span>
+                     </div>
+
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {complements.filter(c => c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                           <div key={c.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center hover:border-red-200 transition-all">
+                              <div className="min-w-0 pr-3">
+                                 <div className="flex items-center gap-1.5">
+                                    <span className="text-sm">➕</span>
+                                    <span className="font-bold text-slate-700 uppercase text-sm truncate block">{c.name}</span>
+                                 </div>
+                                 <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-red-600 font-black uppercase">+ R$ {c.price.toFixed(2)}</span>
+                                    <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">Máx 3</span>
+                                 </div>
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                 <button 
+                                    onClick={() => onToggleComplement(c.id)} 
+                                    className={`text-xs font-black px-3 py-1.5 rounded-lg transition-all ${
+                                       c.active ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-100 text-slate-400'
+                                    }`}
+                                 >
+                                    {c.active ? 'Ativo' : 'Inativo'}
+                                 </button>
+                                 <button 
+                                    onClick={() => requestDelete('COMPLEMENT', c.id, c.name)} 
+                                    className="text-red-500 text-xs font-black hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all"
+                                 >
+                                    Excluir
+                                 </button>
+                              </div>
+                           </div>
+                        ))}
+                        {complements.filter(c => c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')).length === 0 && (
+                           <div className="col-span-full bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-8 text-center text-slate-400 space-y-2">
+                              <span className="text-3xl block">➕</span>
+                              <p className="text-sm font-bold text-slate-600">Nenhum adicional cadastrado ainda.</p>
+                              <p className="text-xs">Cadastre adicionais acima ou clique em "Carregar Adicionais Sugeridos".</p>
+                           </div>
+                        )}
+                     </div>
                   </div>
                </div>
             )}

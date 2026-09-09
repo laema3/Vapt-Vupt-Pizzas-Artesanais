@@ -669,6 +669,10 @@ const App: React.FC = () => {
       mode: 'INTEIRA' | 'MEIO_A_MEIO';
       secondFlavor?: Product;
       calculatedBasePrice: number;
+    },
+    extraOptions?: {
+      selectedBorda?: Complement;
+      selectedAdditionals?: Complement[];
     }
   ) => {
     const compsPrice = comps?.reduce((acc, c) => acc + (c.price || 0), 0) || 0;
@@ -688,6 +692,9 @@ const App: React.FC = () => {
       ? `${product.id}_half_${pizzaOptions.secondFlavor.id}_${Date.now()}`
       : `${product.id}_${Date.now()}`;
 
+    const bordaComp = extraOptions?.selectedBorda || comps?.find(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda'));
+    const additionalsList = extraOptions?.selectedAdditionals || comps?.filter(c => c !== bordaComp);
+
     const newCartItem: CartItem = {
       ...product,
       id: cartItemId,
@@ -695,6 +702,8 @@ const App: React.FC = () => {
       price: finalUnitPrice,
       quantity,
       selectedComplements: comps,
+      selectedBorda: bordaComp,
+      selectedAdditionals: additionalsList,
       pizzaMode: pizzaOptions?.mode,
       firstFlavor: {
         id: product.id,
@@ -1231,7 +1240,7 @@ const App: React.FC = () => {
               }
             }} onDeleteOrder={(id) => dbService.remove('orders', id)} 
             onUpdateCustomer={(id, updates) => dbService.save('customers', id, updates)} onAddCategory={(name) => dbService.save('categories', Math.random().toString(36).substring(7), { name })} onRemoveCategory={(id) => dbService.remove('categories', id)} onUpdateCategory={(id, name) => dbService.save('categories', id, { name })} onAddSubCategory={(catId, name) => dbService.save('sub_categories', Math.random().toString(36).substring(7), { categoryId: catId, name })} onUpdateSubCategory={(id, name, catId) => dbService.save('sub_categories', id, { name, categoryId: catId })} onRemoveSubCategory={(id) => dbService.remove('sub_categories', id)} 
-            onAddComplement={(name, price, cats) => dbService.save('complements', Math.random().toString(36).substring(7), { name, price, applicable_categories: cats, active: true })} onUpdateComplement={(id, name, price, cats) => dbService.save('complements', id, { name, price, applicable_categories: cats })} onToggleComplement={(id) => { const c = complements.find(x => x.id === id); if (c) dbService.save('complements', id, { active: !c.active }); }} onRemoveComplement={(id) => dbService.remove('complements', id)} 
+            onAddComplement={(name, price, cats, type) => dbService.save('complements', Math.random().toString(36).substring(7), { name, price, applicable_categories: cats, active: true, ...(type ? { type } : {}) })} onUpdateComplement={(id, name, price, cats, type) => dbService.save('complements', id, { name, price, applicable_categories: cats, ...(type ? { type } : {}) })} onToggleComplement={(id) => { const c = complements.find(x => x.id === id); if (c) dbService.save('complements', id, { active: !c.active }); }} onRemoveComplement={(id) => dbService.remove('complements', id)} 
             onAddZipRange={(start, end, fee) => dbService.save('zip_ranges', Math.random().toString(36).substring(7), { start, end, fee })} onUpdateZipRange={(id, start, end, fee) => dbService.save('zip_ranges', id, { start, end, fee })} onRemoveZipRange={(id) => dbService.remove('zip_ranges', id)} 
             onAddCoupon={(code, discount, type) => dbService.save('coupons', Math.random().toString(36).substring(7), { code, discount, type, active: true })} onRemoveCoupon={(id) => dbService.remove('coupons', id)} 
             paymentSettings={paymentMethods} onTogglePaymentMethod={(id) => { const p = paymentMethods.find(x => x.id === id); if (p) dbService.save('payment_methods', id, { enabled: !p.enabled }); }} onAddPaymentMethod={(name, type) => dbService.save('payment_methods', Math.random().toString(36).substring(7), { name, type, enabled: true, integration: 'NONE' })} onRemovePaymentMethod={(id) => dbService.remove('payment_methods', id)} onUpdatePaymentSettings={(id, updates) => dbService.save('payment_methods', id, updates)} 
@@ -1558,8 +1567,13 @@ const App: React.FC = () => {
           if (i.pizzaMode === 'MEIO_A_MEIO' && i.secondFlavor) {
             line += `\n   └ 🍕 1/2 ${i.firstFlavor?.name || i.name} (R$ ${(((i.firstFlavor?.price || i.price) / 2)).toFixed(2)}) + 1/2 ${i.secondFlavor.name} (R$ ${((i.secondFlavor.price / 2)).toFixed(2)})`;
           }
-          if (i.selectedComplements && i.selectedComplements.length > 0) {
-            line += `\n   └ ➕ ${i.selectedComplements.map(c => c.name).join(', ')}`;
+          const borda = i.selectedBorda || i.selectedComplements?.find(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda'));
+          const adicionais = i.selectedAdditionals || i.selectedComplements?.filter(c => c !== borda) || [];
+          if (borda) {
+            line += `\n   └ 🥖 Borda: ${borda.name} (+ R$ ${borda.price.toFixed(2)})`;
+          }
+          if (adicionais.length > 0) {
+            line += `\n   └ ➕ Adicionais: ${adicionais.map(c => `${c.name} (+ R$ ${c.price.toFixed(2)})`).join(', ')}`;
           }
           return line;
         }).join('\n');

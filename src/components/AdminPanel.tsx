@@ -193,8 +193,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
   const [localAddress, setLocalAddress] = useState(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
   const [localCity, setLocalCity] = useState(socialLinks?.city || 'Uberaba - MG');
-  const [localSlogan, setLocalSlogan] = useState(socialLinks?.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.');
-  const [localStoreName, setLocalStoreName] = useState(storeName || 'VAPT VUPT');
+  const [localSlogan, setLocalSlogan] = useState(socialLinks?.slogan || 'Pizzas artesanais com bordas recheadas de dar água na boca.');
+  const [localStoreName, setLocalStoreName] = useState(storeName || 'BELLA BORDA');
   const [localOrderMinutes, setLocalOrderMinutes] = useState(socialLinks?.orderEstimatedMinutes || 30);
   const [storeInfoSaved, setStoreInfoSaved] = useState(false);
   const [orderMinutesSaved, setOrderMinutesSaved] = useState(false);
@@ -227,12 +227,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     setLocalInstagramPixel(socialLinks?.instagramPixelId || '');
     setLocalAddress(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
     setLocalCity(socialLinks?.city || 'Uberaba - MG');
-    setLocalSlogan(socialLinks?.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.');
+    setLocalSlogan(socialLinks?.slogan || 'Pizzas artesanais com bordas recheadas de dar água na boca.');
     setLocalOrderMinutes(socialLinks?.orderEstimatedMinutes ? Number(socialLinks.orderEstimatedMinutes) : 30);
   }, [socialLinks]);
 
   useEffect(() => {
-    setLocalStoreName(storeName || 'VAPT VUPT');
+    setLocalStoreName(storeName || 'BELLA BORDA');
   }, [storeName]);
 
   useEffect(() => {
@@ -330,7 +330,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
       <body>
         <div class="coupon-content">
           <div class="header">
-            <h1>MEU DELIVERY</h1>
+            <h1>${storeName || 'BELLA BORDA'}</h1>
             <h2>Pedido #${order.id.substring(0,5)}</h2>
             <p>${new Date(order.createdAt).toLocaleString('pt-BR')}</p>
           </div>
@@ -356,11 +356,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           </div>
           <div class="footer">
             <p>Obrigado pela preferência!</p>
-            <p>CNPJ: 64.412.248/0001-42 - VAPT VUPT PASTEL E HOTDOG LTDA</p>
+            <p>CNPJ: 64.412.248/0001-42 - ${storeName || 'BELLA BORDA PIZZARIA'} LTDA</p>
             <p>AV. LUCAS BORGES, 586 - FABRÍCIO</p>
             <p>UBERABA - MG - FONE: 34-9-9262-7077</p>
             <p>IE: 53999960035</p>
-            <p>www.bertimpastelhotdog.com.br</p>
+            <p>www.bellaborda.com.br</p>
           </div>
         </div>
         <script>
@@ -1699,7 +1699,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                              }} 
                              onBlur={() => onUpdateStoreName(localStoreName)}
                              className={inputClass} 
-                             placeholder="VAPT VUPT" 
+                             placeholder="BELLA BORDA" 
                            />
                         </div>
 
@@ -2141,7 +2141,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                                onUpdateStoreName(e.target.value);
                              }} 
                              onBlur={() => onUpdateStoreName(localStoreName)} 
-                             placeholder="Ex: Pizzaria Bella / VAPT VUPT" 
+                             placeholder="Ex: Bella Borda Pizzaria" 
                              className={inputClass} 
                            />
                            <p className="text-[11px] text-slate-400 font-medium">Nome exibido no cardápio, topo e rodapé.</p>
@@ -2167,11 +2167,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                         </div>
                         <div className="space-y-1">
                            <label className={labelClass}>Instagram (URL completa)</label>
-                           <input value={localInstagram} onChange={e => setLocalInstagram(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, instagram: localInstagram })} placeholder="https://instagram.com/bertimpastelhotdog" className={inputClass} />
+                           <input value={localInstagram} onChange={e => setLocalInstagram(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, instagram: localInstagram })} placeholder="https://instagram.com/bellaborda" className={inputClass} />
                         </div>
                         <div className="space-y-1">
                            <label className={labelClass}>Facebook (URL completa)</label>
-                           <input value={localFacebook} onChange={e => setLocalFacebook(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, facebook: localFacebook })} placeholder="https://facebook.com/bertimpastelhotdog" className={inputClass} />
+                           <input value={localFacebook} onChange={e => setLocalFacebook(e.target.value)} onBlur={() => onUpdateSocialLinks({ ...socialLinks, facebook: localFacebook })} placeholder="https://facebook.com/bellaborda" className={inputClass} />
                         </div>
                         <div className="space-y-1 md:col-span-2">
                            <label className={labelClass}>Mensagem do Rodapé / Slogan (Subtítulo)</label>
@@ -2179,7 +2179,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                              value={localSlogan} 
                              onChange={e => setLocalSlogan(e.target.value)} 
                              onBlur={() => onUpdateSocialLinks({ ...socialLinks, slogan: localSlogan })} 
-                             placeholder="O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido." 
+                             placeholder="Pizzas artesanais com bordas recheadas de dar água na boca. Ingredientes frescos e muito sabor em cada pedido." 
                              rows={2}
                              className={inputClass + " resize-none"} 
                            />

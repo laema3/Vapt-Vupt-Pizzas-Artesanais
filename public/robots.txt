@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bertimpastelhotdog.com.br/sitemap.xml
-Host: https://bertimpastelhotdog.com.br
+Sitemap: https://www.bellaborda.com.br/sitemap.xml
+Host: https://www.bellaborda.com.br

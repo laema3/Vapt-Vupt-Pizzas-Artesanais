@@ -1,5 +1,5 @@
 
-# 🍔 BERTIM - Pastel e Hotdog
+# 🍕 Bella Borda Pizzaria
 
 Seu site de delivery já está configurado e pronto para testes locais!
 

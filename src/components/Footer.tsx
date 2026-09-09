@@ -11,7 +11,7 @@ interface FooterProps {
   onWaiterClick?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ logoUrl, storeName = 'VAPT VUPT', isStoreOpen, socialLinks, onAdminClick, onMotoboyClick, onWaiterClick }) => {
+export const Footer: React.FC<FooterProps> = ({ logoUrl, storeName = 'BELLA BORDA', isStoreOpen, socialLinks, onAdminClick, onMotoboyClick, onWaiterClick }) => {
   return (
     <footer className="bg-slate-900 text-slate-400 py-12 px-6 mt-20">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12">
@@ -26,7 +26,7 @@ export const Footer: React.FC<FooterProps> = ({ logoUrl, storeName = 'VAPT VUPT'
             </div>
           </div>
           <p className="text-sm leading-relaxed max-w-xs">
-            {socialLinks.slogan || 'O melhor pastel e hotdog da região. Ingredientes frescos e muito sabor em cada pedido.'}
+            {socialLinks.slogan || 'Pizzas artesanais com bordas recheadas de dar água na boca. Ingredientes frescos e muito sabor em cada pedido.'}
           </p>
         </div>
 

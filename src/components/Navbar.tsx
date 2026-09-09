@@ -24,7 +24,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ 
   cartCount, onCartClick, isAdmin, isKioskMode, onToggleAdmin, searchTerm, onSearchChange, 
-  currentUser, onAuthClick, onLogout, onMyOrdersClick, onProfileClick, isStoreOpen, logoUrl, storeName = 'VAPT VUPT',
+  currentUser, onAuthClick, onLogout, onMyOrdersClick, onProfileClick, isStoreOpen, logoUrl, storeName = 'BELLA BORDA',
   isWaiter, onBackToTables
 }) => {
   return (

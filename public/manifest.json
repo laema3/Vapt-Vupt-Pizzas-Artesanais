@@ -1,8 +1,8 @@
 
 {
-  "short_name": "BERTIM",
-  "name": "BERTIM - Pastel e Hotdog",
-  "description": "O melhor pastel e hotdog da região na palma da sua mão.",
+  "short_name": "BELLA BORDA",
+  "name": "Bella Borda Pizzaria",
+  "description": "As melhores pizzas artesanais com bordas recheadas na palma da sua mão.",
   "categories": ["food", "shopping"],
   "icons": [
     {
@@ -24,21 +24,21 @@
       "sizes": "1080x1920",
       "type": "image/jpeg",
       "form_factor": "narrow",
-      "label": "Cardápio BERTIM"
+      "label": "Cardápio Bella Borda"
     },
     {
       "src": "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=1920&h=1080&fit=crop",
       "sizes": "1920x1080",
       "type": "image/jpeg",
       "form_factor": "wide",
-      "label": "Nossos Combos"
+      "label": "Nossas Pizzas"
     }
   ],
   "shortcuts": [
     {
       "name": "Ver Cardápio",
       "short_name": "Cardápio",
-      "description": "Veja nossos pastéis e hotdogs",
+      "description": "Veja nossas pizzas e bordas recheadas",
       "url": "/#menu-anchor",
       "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3075/3075977.png", "sizes": "192x192" }]
     },

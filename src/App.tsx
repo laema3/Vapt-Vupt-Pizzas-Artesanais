@@ -52,7 +52,7 @@ const App: React.FC = () => {
   const [isKioskMode, setIsKioskMode] = useState(() => safeStorage.getItem('nl_kiosk_enabled') === 'true');
   const [kioskStarted, setKioskStarted] = useState(false);
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO);
-  const [storeName, setStoreName] = useState('VAPT VUPT');
+  const [storeName, setStoreName] = useState('BELLA BORDA');
   const [themeColor, setThemeColor] = useState(() => safeStorage.getItem('nl_theme_color') || 'red');
   const [socialLinks, setSocialLinks] = useState({ 
     instagram: '', whatsapp: '', facebook: '', 
@@ -239,9 +239,9 @@ const App: React.FC = () => {
 
       // 2. Gera manifesto dinâmico para garantir o ícone do App instalado
       const dynamicManifest = {
-        "short_name": "VAPT VUPT",
-        "name": "VAPT VUPT - Pastel e Hotdog",
-        "description": "O melhor pastel e hotdog da região na palma da sua mão.",
+        "short_name": "BELLA BORDA",
+        "name": "Bella Borda Pizzaria",
+        "description": "As melhores pizzas artesanais com bordas recheadas na palma da sua mão.",
         "categories": ["food", "shopping"],
         "icons": [
           {
@@ -263,21 +263,21 @@ const App: React.FC = () => {
             "sizes": "1080x1920",
             "type": "image/jpeg",
             "form_factor": "narrow",
-            "label": "Cardápio VAPT VUPT"
+            "label": "Cardápio Bella Borda"
           },
           {
             "src": "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=1920&h=1080&fit=crop",
             "sizes": "1920x1080",
             "type": "image/jpeg",
             "form_factor": "wide",
-            "label": "Nossos Combos"
+            "label": "Nossas Pizzas"
           }
         ],
         "shortcuts": [
           {
             "name": "Ver Cardápio",
             "short_name": "Cardápio",
-            "description": "Veja nossos pastéis e hotdogs",
+            "description": "Veja nossas pizzas e bordas recheadas",
             "url": "/#menu-anchor",
             "icons": [{ "src": logoUrl, "sizes": "192x192" }]
           },
@@ -987,7 +987,7 @@ const App: React.FC = () => {
                      unit_price: item.price
                    })),
                    payer: {
-                     email: currentUser?.email || 'cliente@bertim.com',
+                     email: currentUser?.email || 'cliente@bellaborda.com.br',
                      name: currentUser?.name || 'Cliente'
                    },
                    external_reference: orderId,
@@ -1134,7 +1134,7 @@ const App: React.FC = () => {
                   filter: 'drop-shadow(4px 4px 0 rgba(0,0,0,0.5))'
                 }}
               >
-                VAPT VUPT
+                {storeName || 'BELLA BORDA'}
               </h1>
               <h2 
                 className="font-black text-3xl sm:text-5xl uppercase tracking-tighter mt-2" 
@@ -1143,7 +1143,7 @@ const App: React.FC = () => {
                   filter: 'drop-shadow(2px 2px 0 rgba(0,0,0,0.5))'
                 }}
               >
-                PASTEL & HOTDOG
+                PIZZAS ARTESANAIS
               </h2>
               <p className="text-xl sm:text-2xl text-white/80 font-black uppercase tracking-[0.2em] mt-8">Autoatendimento</p>
             </div>
@@ -1361,7 +1361,7 @@ const App: React.FC = () => {
                                 filter: 'drop-shadow(4px 4px 0 rgba(0,0,0,0.8))'
                               }}
                             >
-                              VAPT VUPT
+                              {storeName || 'BELLA BORDA'}
                             </h1>
                             <h2 
                               className="font-black text-xl sm:text-3xl uppercase tracking-tighter mt-2" 
@@ -1370,7 +1370,7 @@ const App: React.FC = () => {
                                 filter: 'drop-shadow(2px 2px 0 rgba(0,0,0,0.8))'
                               }}
                             >
-                              PASTEL & HOTDOG
+                              PIZZAS ARTESANAIS
                             </h2>
                           </>
                         </div>
@@ -1382,7 +1382,7 @@ const App: React.FC = () => {
                         <div className="absolute inset-0 bg-white/20 blur-xl rounded-full"></div>
                         <img 
                           src={logoUrl} 
-                          alt="Logo VAPT VUPT" 
+                          alt="Logo Bella Borda" 
                           className="relative w-28 h-28 sm:w-36 sm:h-36 object-contain border-4 border-white shadow-2xl rounded-full bg-white/10 backdrop-blur-sm p-1.5" 
                           referrerPolicy="no-referrer"
                         />

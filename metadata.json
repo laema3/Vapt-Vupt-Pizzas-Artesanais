@@ -1,8 +1,8 @@
 {
   "name": "Remix: VAPIT VUPT",
-  "short_name": "BERTIM",
-  "description": "As Melhores Pizzas Artesanais de Uberaba!",
-  "homepage": "https://delivery.com.br",
+  "short_name": "BELLA BORDA",
+  "description": "As Melhores Pizzas Artesanais com Bordas Recheadas de Uberaba!",
+  "homepage": "https://www.bellaborda.com.br",
   "requestFramePermissions": [
     "geolocation",
     "camera",

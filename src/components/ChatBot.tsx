@@ -35,7 +35,7 @@ const getAiClient = () => {
 export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, isStoreOpen, currentUser, onAddToCart, socialLinks }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ text: string; isUser: boolean; }[]>([
-    { text: 'Olá! Sou o BertimBot 🤖. Posso te ajudar a escolher um pastel ou hotdog, tirar dúvidas ou até fazer seu pedido por aqui! O que você manda?', isUser: false }
+    { text: 'Olá! Sou o BellaBot 🤖. Posso te ajudar a escolher sua pizza artesanal com borda recheada, tirar dúvidas ou até fazer seu pedido por aqui! O que você gostaria de pedir hoje?', isUser: false }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -59,8 +59,8 @@ export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, i
     const formattedWa = waNumber.length >= 13 ? `(${waNumber.substring(2, 4)}) ${waNumber.substring(4, 9)}-${waNumber.substring(9)}` : '(34) 99118-3728';
     
     const systemInstruction = `
-      Você é o BertimBot, o assistente virtual inteligente e simpático do VAPT VUPT - Pastel e Hotdog.
-      Seu objetivo é ajudar os clientes a escolherem pastéis e hotdogs, tirar dúvidas e realizar pedidos.
+      Você é o BellaBot, o assistente virtual inteligente e simpático da Bella Borda Pizzaria.
+      Seu objetivo é ajudar os clientes a escolherem pizzas artesanais, bordas recheadas e acompanhamentos, tirar dúvidas e realizar pedidos.
       
       CONTEXTO DA LOJA:
       - Status: ${isStoreOpen ? 'ABERTO' : 'FECHADO'}.
@@ -207,7 +207,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, i
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-sm border-2 border-red-100">🤖</div>
               <div>
-                <h3 className="font-black text-white uppercase text-sm tracking-wide">BertimBot IA</h3>
+                <h3 className="font-black text-white uppercase text-sm tracking-wide">BellaBot IA</h3>
                 <p className="text-[10px] text-red-100 font-bold uppercase tracking-widest flex items-center gap-1">
                   <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span> Online
                 </p>

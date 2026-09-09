@@ -182,7 +182,7 @@ export const WeeklyPizzaSuggestions: React.FC<WeeklyPizzaSuggestionsProps> = ({
   };
 
   // Get current site URL
-  const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://bertimpastelhotdog.com.br';
+  const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.bellaborda.com.br';
 
   // Build WhatsApp Message formatted for sharing
   const buildWhatsAppText = (item: DailyPizzaSuggestion) => {

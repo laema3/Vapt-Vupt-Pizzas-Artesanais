@@ -47,6 +47,15 @@ const App: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   
+  const [storeHours, setStoreHours] = useState<Record<number, { enabled: boolean; open: string; close: string }>>({
+    0: { enabled: true, open: '18:00', close: '23:30' },
+    1: { enabled: true, open: '18:00', close: '23:30' },
+    2: { enabled: true, open: '18:00', close: '23:30' },
+    3: { enabled: true, open: '18:00', close: '23:30' },
+    4: { enabled: true, open: '18:00', close: '23:30' },
+    5: { enabled: true, open: '18:00', close: '00:00' },
+    6: { enabled: true, open: '18:00', close: '00:00' },
+  });
   const [isStoreOpen, setIsStoreOpen] = useState(true);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [isKioskMode, setIsKioskMode] = useState(() => safeStorage.getItem('nl_kiosk_enabled') === 'true');
@@ -391,6 +400,7 @@ const App: React.FC = () => {
             if (settings.isMaintenanceMode !== undefined) setIsMaintenanceMode(settings.isMaintenanceMode);
             if (settings.logoUrl) setLogoUrl(settings.logoUrl);
             if (settings.storeName) setStoreName(settings.storeName);
+            if (settings.storeHours) setStoreHours(settings.storeHours);
             if (settings.themeColor) { setThemeColor(settings.themeColor); safeStorage.setItem('nl_theme_color', settings.themeColor); }
             setSocialLinks({ 
               instagram: settings.instagram || '', whatsapp: settings.whatsapp || '', facebook: settings.facebook || '',
@@ -570,14 +580,26 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkStoreSchedule = () => {
       const now = new Date();
+      const day = now.getDay();
       const hours = now.getHours();
       const minutes = now.getMinutes();
-      const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      const currentTimeMinutes = hours * 60 + minutes;
 
-      // Fecha às 23:30
-      if (timeStr === "23:30") {
+      const daySchedule = storeHours[day];
+      if (daySchedule && daySchedule.enabled) {
+        const [closeH, closeM] = (daySchedule.close || '23:30').split(':').map(Number);
+        const closeTimeMinutes = closeH * 60 + closeM;
+
+        if (currentTimeMinutes === closeTimeMinutes) {
+          if (isStoreOpen) {
+            console.log("[Auto-Schedule] Fechando loja automaticamente conforme horário programado:", daySchedule.close);
+            setIsStoreOpen(false);
+            dbService.save('settings', 'general', { isStoreOpen: false });
+          }
+        }
+      } else if (daySchedule && !daySchedule.enabled) {
         if (isStoreOpen) {
-          console.log("[Auto-Schedule] Fechando loja automaticamente (23:30)");
+          console.log("[Auto-Schedule] Fechando loja: dia desativado no controle de horários");
           setIsStoreOpen(false);
           dbService.save('settings', 'general', { isStoreOpen: false });
         }
@@ -588,7 +610,7 @@ const App: React.FC = () => {
     checkStoreSchedule(); // Verifica imediatamente ao carregar
     
     return () => clearInterval(scheduleInterval);
-  }, [isStoreOpen]);
+  }, [isStoreOpen, storeHours]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

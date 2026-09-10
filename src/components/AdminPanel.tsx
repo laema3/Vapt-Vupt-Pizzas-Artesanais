@@ -109,9 +109,11 @@ interface AdminPanelProps {
   onLogout: () => void;
   onBackToSite: () => void;
   onWaiterMode?: () => void;
+  storeHours: Record<number, { enabled: boolean; open: string; close: string }>;
+  onUpdateStoreHours: (hours: Record<number, { enabled: boolean; open: string; close: string }>) => void;
 }
 
-type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'ajustes';
+type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'ajustes';
 
 type DeleteTarget = {
   type: 'ORDER' | 'PRODUCT' | 'CATEGORY' | 'SUBCATEGORY' | 'COMPLEMENT' | 'COUPON' | 'ZIP' | 'PAYMENT' | 'TABLE';
@@ -128,7 +130,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     onAddZipRange, onRemoveZipRange, onAddCoupon, onRemoveCoupon, onLogout, onBackToSite, onWaiterMode,
     paymentSettings, onTogglePaymentMethod, onAddPaymentMethod, onRemovePaymentMethod, onUpdatePaymentSettings,
     authSettings, onUpdateAuthSettings,
-    paymentConfig, onUpdatePaymentConfig
+    paymentConfig, onUpdatePaymentConfig,
+    storeHours, onUpdateStoreHours
   } = props;
 
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
@@ -136,6 +139,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [localStoreHours, setLocalStoreHours] = useState(storeHours || {
+    0: { enabled: true, open: '18:00', close: '23:30' },
+    1: { enabled: true, open: '18:00', close: '23:30' },
+    2: { enabled: true, open: '18:00', close: '23:30' },
+    3: { enabled: true, open: '18:00', close: '23:30' },
+    4: { enabled: true, open: '18:00', close: '23:30' },
+    5: { enabled: true, open: '18:00', close: '00:00' },
+    6: { enabled: true, open: '18:00', close: '00:00' },
+  });
+
+  useEffect(() => {
+    if (storeHours) {
+      setLocalStoreHours(storeHours);
+    }
+  }, [storeHours]);
   
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [showMaintenanceConfirm, setShowMaintenanceConfirm] = useState(false);
@@ -549,6 +567,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           <NavItem active={activeView === 'entregas'} icon="🚚" label="Taxas Frete" onClick={() => setActiveView('entregas')} />
           <NavItem active={activeView === 'clientes'} icon="👥" label="Clientes" onClick={() => setActiveView('clientes')} />
           <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => setActiveView('pagamentos')} />
+          <NavItem active={activeView === 'horarios'} icon="⏰" label="Horários" onClick={() => setActiveView('horarios')} />
           <NavItem active={activeView === 'ajustes'} icon="⚙️" label="Ajustes" onClick={() => setActiveView('ajustes')} />
         </nav>
 
@@ -1526,6 +1545,120 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                           </div>
                        </div>
                      ))}
+                  </div>
+               </div>
+            )}
+
+            {activeView === 'horarios' && (
+               <div className="max-w-4xl space-y-12 animate-in slide-in-from-bottom-5 duration-500 pb-20">
+                  <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                       <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                         <span className="w-10 h-10 bg-red-600 text-white rounded-xl flex items-center justify-center text-xl">⏰</span>
+                         Controle de Dias e Horários de Funcionamento
+                       </h3>
+                       <button
+                         onClick={() => {
+                           onUpdateStoreHours(localStoreHours);
+                           alert("Horários de funcionamento salvos com sucesso!");
+                         }}
+                         className="px-6 py-3.5 bg-red-600 text-white rounded-xl font-black uppercase text-xs tracking-wider hover:bg-red-700 transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer"
+                       >
+                         <span>💾 Salvar Horários</span>
+                       </button>
+                     </div>
+                     <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                       Defina os dias da semana em que a pizzaria abre, bem como os horários de abertura e fechamento para cada dia. Quando a loja estiver fechada segundo este controle, o sistema avisará os clientes.
+                     </p>
+
+                     <div className="space-y-4">
+                       {[
+                         { day: 0, label: 'Domingo' },
+                         { day: 1, label: 'Segunda-feira' },
+                         { day: 2, label: 'Terça-feira' },
+                         { day: 3, label: 'Quarta-feira' },
+                         { day: 4, label: 'Quinta-feira' },
+                         { day: 5, label: 'Sexta-feira' },
+                         { day: 6, label: 'Sábado' },
+                       ].map(({ day, label }) => {
+                         const conf = localStoreHours[day] || { enabled: true, open: '18:00', close: '23:30' };
+                         return (
+                           <div key={day} className={`p-6 rounded-3xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-6 ${conf.enabled ? 'bg-slate-50 border-slate-200' : 'bg-red-50/50 border-red-200/60 opacity-75'}`}>
+                             <div className="flex items-center gap-4">
+                               <label className="relative inline-flex items-center cursor-pointer">
+                                 <input 
+                                   type="checkbox" 
+                                   checked={conf.enabled} 
+                                   onChange={e => {
+                                     const enabled = e.target.checked;
+                                     setLocalStoreHours(prev => ({
+                                       ...prev,
+                                       [day]: { ...conf, enabled }
+                                     }));
+                                   }} 
+                                   className="sr-only peer" 
+                                 />
+                                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                               </label>
+                               <div>
+                                 <h4 className="font-black text-slate-800 uppercase text-sm tracking-tight">{label}</h4>
+                                 <span className={`text-[10px] font-black uppercase tracking-wider ${conf.enabled ? 'text-emerald-600' : 'text-red-500'}`}>
+                                   {conf.enabled ? 'Aberto neste dia' : 'Fechado o dia todo'}
+                                 </span>
+                               </div>
+                             </div>
+
+                             <div className="flex items-center gap-4">
+                               <div className="space-y-1">
+                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Abertura</label>
+                                 <input 
+                                   type="time" 
+                                   value={conf.open} 
+                                   disabled={!conf.enabled}
+                                   onChange={e => {
+                                     const open = e.target.value;
+                                     setLocalStoreHours(prev => ({
+                                       ...prev,
+                                       [day]: { ...conf, open }
+                                     }));
+                                   }}
+                                   className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 disabled:opacity-50"
+                                 />
+                               </div>
+                               <span className="text-slate-400 font-bold mt-5">até</span>
+                               <div className="space-y-1">
+                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Fechamento</label>
+                                 <input 
+                                   type="time" 
+                                   value={conf.close} 
+                                   disabled={!conf.enabled}
+                                   onChange={e => {
+                                     const close = e.target.value;
+                                     setLocalStoreHours(prev => ({
+                                       ...prev,
+                                       [day]: { ...conf, close }
+                                     }));
+                                   }}
+                                   className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 disabled:opacity-50"
+                                 />
+                               </div>
+                             </div>
+                           </div>
+                         );
+                       })}
+                     </div>
+
+                     <div className="flex justify-end pt-4">
+                       <button
+                         onClick={() => {
+                           onUpdateStoreHours(localStoreHours);
+                           alert("Horários de funcionamento salvos com sucesso!");
+                         }}
+                         className="px-8 py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-xs tracking-wider hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+                       >
+                         <span>💾 Salvar Horários de Funcionamento</span>
+                       </button>
+                     </div>
                   </div>
                </div>
             )}

@@ -119,34 +119,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     const list = applicableComplements.filter(c => 
       c.type === 'BORDA' || c.name.toLowerCase().includes('borda')
     );
-    // Se for pizza e não houver bordas cadastradas no banco, fornece opções padrão de borda
-    if (list.length === 0 && isPizza) {
-      return [
-        { id: 'borda_catupiry_padrao', name: 'Borda Catupiry Tradicional', price: 12.00, active: true, type: 'BORDA' as const },
-        { id: 'borda_cheddar_padrao', name: 'Borda Cheddar Cremoso', price: 10.00, active: true, type: 'BORDA' as const },
-        { id: 'borda_chocolate_padrao', name: 'Borda Chocolate ao Leite', price: 14.00, active: true, type: 'BORDA' as const },
-        { id: 'borda_creamcheese_padrao', name: 'Borda Cream Cheese', price: 13.00, active: true, type: 'BORDA' as const },
-      ];
-    }
     return list;
-  }, [applicableComplements, isPizza]);
+  }, [applicableComplements]);
 
   const adicionalItems = useMemo(() => {
     const list = applicableComplements.filter(c => 
       c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')
     );
-    // Se for pizza e não houver adicionais cadastrados no banco, fornece opções padrão
-    if (list.length === 0 && isPizza) {
-      return [
-        { id: 'adic_bacon_padrao', name: 'Bacon em Cubos', price: 6.00, active: true, type: 'ADICIONAL' as const },
-        { id: 'adic_mussarela_padrao', name: 'Mussarela Extra', price: 7.00, active: true, type: 'ADICIONAL' as const },
-        { id: 'adic_milho_padrao', name: 'Milho Verde', price: 3.50, active: true, type: 'ADICIONAL' as const },
-        { id: 'adic_palmito_padrao', name: 'Palmito Picado', price: 5.50, active: true, type: 'ADICIONAL' as const },
-        { id: 'adic_cebola_padrao', name: 'Cebola Crispy', price: 4.00, active: true, type: 'ADICIONAL' as const },
-      ];
-    }
     return list;
-  }, [applicableComplements, isPizza]);
+  }, [applicableComplements]);
 
   // Lista de outros sabores de pizza disponíveis para a segunda metade
   const availableSecondFlavors = useMemo(() => {

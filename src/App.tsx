@@ -1274,6 +1274,11 @@ const App: React.FC = () => {
               // Salva no banco de dados apenas os campos de pagamento (merge)
               dbService.save('settings', 'general', newConfig);
             }}
+            storeHours={storeHours}
+            onUpdateStoreHours={(hours) => {
+              setStoreHours(hours);
+              dbService.save('settings', 'general', { storeHours: hours });
+            }}
             onLogout={() => { 
               setShowAdminPanel(false); 
               setIsAdminAuthenticated(false);

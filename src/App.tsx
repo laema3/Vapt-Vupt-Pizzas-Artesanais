@@ -268,14 +268,14 @@ const App: React.FC = () => {
         ],
         "screenshots": [
           {
-            "src": "https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=1080&h=1920&fit=crop",
+            "src": "https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1080&h=1920&fit=crop",
             "sizes": "1080x1920",
             "type": "image/jpeg",
             "form_factor": "narrow",
             "label": "Cardápio Bella Borda"
           },
           {
-            "src": "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=1920&h=1080&fit=crop",
+            "src": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1920&h=1080&fit=crop",
             "sizes": "1920x1080",
             "type": "image/jpeg",
             "form_factor": "wide",
@@ -1247,7 +1247,14 @@ const App: React.FC = () => {
             isMaintenanceMode={isMaintenanceMode} onToggleMaintenance={() => { const next = !isMaintenanceMode; setIsMaintenanceMode(next); dbService.save('settings', 'general', { isMaintenanceMode: next }); }}
             themeColor={themeColor} onUpdateThemeColor={(color) => { setThemeColor(color); safeStorage.setItem('nl_theme_color', color); dbService.save('settings', 'general', { themeColor: color }); }}
             isKioskMode={isKioskMode} onToggleKioskMode={() => { const next = !isKioskMode; setIsKioskMode(next); safeStorage.setItem('nl_kiosk_enabled', String(next)); }} 
-            logoUrl={logoUrl} onUpdateLogo={(url) => dbService.save('settings', 'general', { logoUrl: url })}
+            logoUrl={logoUrl} onUpdateLogo={(url) => {
+              dbService.save('settings', 'general', { logoUrl: url });
+              fetch('/api/sync-logo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logoUrl: url })
+              }).catch(() => {});
+            }}
             storeName={storeName} onUpdateStoreName={(name) => { setStoreName(name); dbService.save('settings', 'general', { storeName: name }); }}
             socialLinks={socialLinks} onUpdateSocialLinks={(links) => dbService.save('settings', 'general', { ...links })} 
             authSettings={authSettings} onUpdateAuthSettings={(settings) => dbService.save('settings', 'auth', settings)}

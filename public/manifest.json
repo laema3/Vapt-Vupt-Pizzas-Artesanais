@@ -6,13 +6,13 @@
   "categories": ["food", "shopping"],
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3075/3075977.png",
+      "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3075/3075977.png",
+      "src": "/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
@@ -20,14 +20,14 @@
   ],
   "screenshots": [
     {
-      "src": "https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=1080&h=1920&fit=crop",
+      "src": "https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1080&h=1920&fit=crop",
       "sizes": "1080x1920",
       "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Cardápio Bella Borda"
     },
     {
-      "src": "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=1920&h=1080&fit=crop",
+      "src": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1920&h=1080&fit=crop",
       "sizes": "1920x1080",
       "type": "image/jpeg",
       "form_factor": "wide",
@@ -40,14 +40,14 @@
       "short_name": "Cardápio",
       "description": "Veja nossas pizzas e bordas recheadas",
       "url": "/#menu-anchor",
-      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3075/3075977.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Meus Pedidos",
       "short_name": "Pedidos",
       "description": "Acompanhe seus pedidos",
       "url": "/#orders",
-      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3075/3075977.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "start_url": "/",

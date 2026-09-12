@@ -279,6 +279,85 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is healthy' });
 });
 
+// Endpoint dedicado para servir a logomarca para OpenGraph / WhatsApp / Redes Sociais
+app.get(['/logo.jpg', '/og-image.jpg', '/logo.png'], (req, res, next) => {
+  const isJpg = req.path.endsWith('.jpg');
+  const primaryFile = isJpg ? 'logo.jpg' : 'logo.png';
+  const fallbackFile = isJpg ? 'logo.png' : 'logo.jpg';
+  
+  const primaryPath = path.resolve('public', primaryFile);
+  const fallbackPath = path.resolve('public', fallbackFile);
+
+  if (fs.existsSync(primaryPath)) {
+    res.setHeader('Content-Type', isJpg ? 'image/jpeg' : 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(primaryPath);
+  } else if (fs.existsSync(fallbackPath)) {
+    res.setHeader('Content-Type', isJpg ? 'image/png' : 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(fallbackPath);
+  }
+  next();
+});
+
+// Endpoint para sincronização da logomarca quando atualizada no painel administrativo
+app.post('/api/sync-logo', (req, res) => {
+  try {
+    const { logoUrl } = req.body;
+    if (logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('data:image/')) {
+      const parts = logoUrl.split(',');
+      const base64Data = parts[1];
+      const buffer = Buffer.from(base64Data, 'base64');
+      const publicDir = path.resolve('public');
+      
+      fs.writeFileSync(path.join(publicDir, 'logo.jpg'), buffer);
+      fs.writeFileSync(path.join(publicDir, 'logo.png'), buffer);
+      
+      const distDir = path.resolve('dist');
+      if (fs.existsSync(distDir)) {
+        fs.writeFileSync(path.join(distDir, 'logo.jpg'), buffer);
+        fs.writeFileSync(path.join(distDir, 'logo.png'), buffer);
+      }
+      return res.json({ success: true, bytes: buffer.length });
+    }
+    return res.status(400).json({ error: 'Formato de logo inválido' });
+  } catch (err: any) {
+    console.error('Erro ao sincronizar logo:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Interceptor para crawlers de compartilhamento (WhatsApp, Facebook, Twitter, Telegram, etc.)
+const CRAWLER_REGEX = /whatsapp|facebookexternalhit|facebot|twitterbot|telegrambot|slackbot|linkedinbot|pinterest|discordbot/i;
+
+app.use((req, res, next) => {
+  const userAgent = req.headers['user-agent'] || '';
+  if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html' || !req.path.includes('.')) && CRAWLER_REGEX.test(userAgent)) {
+    try {
+      const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+      const rawHost = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'www.bellaborda.com.br';
+      const host = rawHost.split(',')[0].trim();
+      const baseUrl = `${proto}://${host}`;
+
+      let htmlPath = path.resolve('dist', 'index.html');
+      if (!fs.existsSync(htmlPath)) {
+        htmlPath = path.resolve('index.html');
+      }
+
+      if (fs.existsSync(htmlPath)) {
+        let html = fs.readFileSync(htmlPath, 'utf-8');
+        html = html.replace(/https:\/\/www\.bellaborda\.com\.br\/logo\.jpg/g, `${baseUrl}/logo.jpg`);
+        html = html.replace(/https:\/\/www\.bellaborda\.com\.br/g, baseUrl);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(html);
+      }
+    } catch (e) {
+      console.error('Erro ao interceptar crawler social:', e);
+    }
+  }
+  next();
+});
+
 // Vite middleware para desenvolvimento
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   async function setupVite() {

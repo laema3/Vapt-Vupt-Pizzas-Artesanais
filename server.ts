@@ -285,9 +285,10 @@ app.get('/api/health', (req, res) => {
 app.post('/api/chat', async (req, res) => {
   try {
     const { messages, storeContext, customApiKey } = req.body;
+    const serverKey = process.env.GEMINI_API_KEY || process.env.VITE_API_KEY || process.env.GOOGLE_GENAI_API_KEY || process.env.GOOGLE_API_KEY || 'AIzaSyCGIDPicH6-rOqDexrTfNUnMqxIQGja5oA';
     const apiKey = (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10)
       ? customApiKey.trim()
-      : process.env.GEMINI_API_KEY;
+      : serverKey;
 
     if (!apiKey) {
       return res.status(500).json({
@@ -505,9 +506,10 @@ REGRAS GERAIS:
 app.post('/api/test-gemini', async (req, res) => {
   try {
     const { customApiKey } = req.body;
+    const serverKey = process.env.GEMINI_API_KEY || process.env.VITE_API_KEY || process.env.GOOGLE_GENAI_API_KEY || process.env.GOOGLE_API_KEY || 'AIzaSyCGIDPicH6-rOqDexrTfNUnMqxIQGja5oA';
     const apiKey = (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10)
       ? customApiKey.trim()
-      : process.env.GEMINI_API_KEY;
+      : serverKey;
 
     if (!apiKey) {
       return res.status(400).json({ success: false, error: 'Chave de API Gemini não encontrada.' });

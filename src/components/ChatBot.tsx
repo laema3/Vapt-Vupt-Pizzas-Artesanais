@@ -1,275 +1,486 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Product, CartItem, Customer } from '../types';
-import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
+import { Product, CartItem, Customer, CategoryItem, SubCategoryItem, Complement, ZipRange, Coupon, PaymentSettings, BotSettings } from '../types.ts';
+import { Send, Bot, Sparkles, X, ShoppingCart, Check, RefreshCw } from 'lucide-react';
 
 interface ChatBotProps {
   products: Product[];
+  categories?: CategoryItem[];
+  subCategories?: SubCategoryItem[];
+  complements?: Complement[];
+  zipRanges?: ZipRange[];
+  coupons?: Coupon[];
+  storeHours?: Record<number, { enabled: boolean; open: string; close: string }>;
+  paymentMethods?: PaymentSettings[];
   cart: CartItem[];
   deliveryFee: number;
   isStoreOpen: boolean;
   currentUser: Customer | null;
-  onAddToCart: (product: Product, quantity: number) => void;
-  socialLinks?: { whatsapp?: string; address?: string; city?: string; };
+  onAddToCart: (
+    product: Product, 
+    quantity: number, 
+    comps?: Complement[],
+    pizzaOptions?: {
+      mode: 'INTEIRA' | 'MEIO_A_MEIO';
+      secondFlavor?: Product;
+      calculatedBasePrice: number;
+    },
+    extraOptions?: {
+      selectedBorda?: Complement;
+      selectedMassa?: string;
+      bordaGratis?: boolean;
+      freeBordaReason?: string;
+    }
+  ) => void;
+  socialLinks?: { 
+    whatsapp?: string; 
+    address?: string; 
+    city?: string;
+    slogan?: string;
+    orderEstimatedMinutes?: number;
+  };
+  botSettings?: BotSettings;
+  storeName?: string;
+  onOpenCart?: () => void;
 }
 
-// Inicializa o cliente Gemini
-// Nota: A chave de API deve estar disponível em import.meta.env.VITE_API_KEY
-let aiClient: GoogleGenAI | null = null;
+interface ChatMessage {
+  id: string;
+  text: string;
+  isUser: boolean;
+  addedItem?: {
+    name: string;
+    quantity: number;
+    price: number;
+    borda?: string;
+  };
+  timestamp: Date;
+}
 
-const getAiClient = () => {
-  if (!aiClient) {
-    // Tenta buscar a chave de diferentes formas para garantir compatibilidade
-    const apiKey = process.env.GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || '';
-    
-    if (!apiKey) {
-      console.error("API Key não configurada no ambiente");
-      return null;
-    }
-    console.log("Inicializando cliente Gemini com chave configurada");
-    aiClient = new GoogleGenAI({ apiKey });
-  }
-  return aiClient;
-};
-
-export const ChatBot: React.FC<ChatBotProps> = ({ products, cart, deliveryFee, isStoreOpen, currentUser, onAddToCart, socialLinks }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({
+  products,
+  complements = [],
+  zipRanges = [],
+  coupons = [],
+  storeHours,
+  paymentMethods = [],
+  cart,
+  deliveryFee,
+  isStoreOpen,
+  currentUser,
+  onAddToCart,
+  socialLinks,
+  botSettings,
+  storeName = 'Bella Borda Pizzaria',
+  onOpenCart
+}) => {
+  const botName = botSettings?.botName || 'BellaBot';
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{ text: string; isUser: boolean; }[]>([
-    { text: 'Olá! Sou o BellaBot 🤖. Posso te ajudar a escolher sua pizza artesanal com borda recheada, tirar dúvidas ou até fazer seu pedido por aqui! O que você gostaria de pedir hoje?', isUser: false }
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      text: `Olá! Sou a ${botName} 🤖🍕. Sou sua atendente virtual e especialista em pizzas artesanais e bordas recheadas da ${storeName}! Posso te ajudar com o cardápio, indicar as melhores opções, tirar dúvidas de entregas ou até montar seu pedido por aqui. O que você gostaria de pedir hoje?`,
+      isUser: false,
+      timestamp: new Date()
+    }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [hasNewMessageBadge, setHasNewMessageBadge] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatSessionRef = useRef<any>(null);
-  const ai = getAiClient();
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(scrollToBottom, [messages, isTyping]);
-
-  // Inicializa a sessão de chat quando o componente monta ou quando os produtos mudam
   useEffect(() => {
-    const visibleProducts = products.filter(p => !p.hidden);
-    if (!visibleProducts.length || !ai) return;
+    if (isOpen) {
+      scrollToBottom();
+      setHasNewMessageBadge(false);
+    }
+  }, [isOpen, messages, isTyping]);
 
-    const menuContext = visibleProducts.map(p => `${p.name} (${p.category}): R$ ${p.price.toFixed(2)} - ${p.description}`).join('\n');
-    const waNumber = socialLinks?.whatsapp || '5534991183728';
-    const formattedWa = waNumber.length >= 13 ? `(${waNumber.substring(2, 4)}) ${waNumber.substring(4, 9)}-${waNumber.substring(9)}` : '(34) 99118-3728';
-    
-    const systemInstruction = `
-      Você é o BellaBot, o assistente virtual inteligente e simpático da Bella Borda Pizzaria.
-      Seu objetivo é ajudar os clientes a escolherem pizzas artesanais, bordas recheadas e acompanhamentos, tirar dúvidas e realizar pedidos.
-      
-      CONTEXTO DA LOJA:
-      - Status: ${isStoreOpen ? 'ABERTO' : 'FECHADO'}.
-      - Taxa de entrega base: R$ ${deliveryFee.toFixed(2)}.
-      - Horário: Terça a Domingo, das 18h às 23h.
-      - Contato / WhatsApp: ${formattedWa}.
-      - Endereço: ${socialLinks?.address || 'Rua dos Andradas, 123 - Abadia'}, ${socialLinks?.city || 'Uberaba - MG'}.
+  // Função auxiliar para busca de produto por similaridade/fuzzy
+  const findProductMatch = (searchName: string): Product | undefined => {
+    if (!searchName) return undefined;
+    const normalize = (str: string) =>
+      str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
-      CARDÁPIO ATUAL:
-      ${menuContext}
+    const normalizedTarget = normalize(searchName);
 
-      REGRAS DE COMPORTAMENTO:
-      1. Seja sempre educado, use emojis 🍔🍟🥤 e tenha um tom jovial.
-      2. Se o cliente quiser pedir algo, USE A FERRAMENTA 'addToCart'. Não peça para ele adicionar manualmente se você pode fazer isso.
-      3. Se o cliente perguntar preço, consulte o cardápio acima.
-      4. Se o cliente perguntar sobre entrega, informe a taxa base e diga que depende do bairro.
-      5. Se o cliente quiser finalizar, diga para ele clicar no carrinho de compras no topo ou na lateral.
-      6. Se não entender algo, peça desculpas e tente oferecer opções do cardápio.
-      7. Responda de forma concisa, ideal para chat.
-    `;
+    // 1. Busca por igualdade exata
+    const exact = products.find(p => normalize(p.name) === normalizedTarget);
+    if (exact) return exact;
 
-    // Definição das ferramentas (Tools)
-    const addToCartTool: FunctionDeclaration = {
-      name: "addToCart",
-      description: "Adiciona um item do cardápio ao carrinho de compras do cliente.",
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          productName: {
-            type: Type.STRING,
-            description: "O nome do produto a ser adicionado (ex: 'X-Tudo', 'Coca-Cola'). Tente encontrar o nome mais próximo no cardápio."
-          },
-          quantity: {
-            type: Type.NUMBER,
-            description: "A quantidade do produto. Padrão é 1."
-          }
-        },
-        required: ["productName"]
-      }
-    };
+    // 2. Busca por inclusão (ex: "calabresa" em "Pizza Calabresa Especial")
+    const included = products.find(p => {
+      const pNorm = normalize(p.name);
+      return pNorm.includes(normalizedTarget) || normalizedTarget.includes(pNorm);
+    });
+    if (included) return included;
 
-    const getMenuTool: FunctionDeclaration = {
-      name: "getMenu",
-      description: "Retorna a lista de produtos do cardápio para consulta.",
-      parameters: {
-        type: Type.OBJECT,
-        properties: {},
-      }
-    };
-
-    try {
-      chatSessionRef.current = ai.chats.create({
-        model: "gemini-3-flash-preview", // Modelo atualizado
-        config: {
-          systemInstruction: systemInstruction,
-          tools: [{ functionDeclarations: [addToCartTool, getMenuTool] }],
-        },
+    // 3. Busca por palavras individuais
+    const targetWords = normalizedTarget.split(/\s+/).filter(w => w.length > 2);
+    if (targetWords.length > 0) {
+      const wordMatch = products.find(p => {
+        const pNorm = normalize(p.name);
+        return targetWords.some(w => pNorm.includes(w));
       });
-    } catch (e) {
-      console.error("Erro ao inicializar chat Gemini:", e);
+      if (wordMatch) return wordMatch;
     }
 
-  }, [products, isStoreOpen, deliveryFee, ai, socialLinks?.whatsapp, socialLinks?.address, socialLinks?.city]);
+    return undefined;
+  };
 
-  const handleAddToCartTool = (productName: string, quantity: number = 1) => {
-    // Busca fuzzy simples
-    const normalizedSearch = productName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const product = products.find(p => 
-      p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(normalizedSearch)
-    );
+  // Função auxiliar para busca de borda
+  const findBordaMatch = (bordaName?: string): Complement | undefined => {
+    if (!bordaName) return undefined;
+    const normalize = (str: string) =>
+      str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
-    if (product) {
-      onAddToCart(product, quantity);
-      return { success: true, message: `Adicionei ${quantity}x ${product.name} ao seu carrinho! 🛒`, product: product.name, price: product.price };
-    } else {
-      return { success: false, message: `Desculpe, não encontrei "${productName}" no cardápio. Tente outro nome.` };
-    }
+    const target = normalize(bordaName);
+    const bordas = complements.filter(c => c.active && (c.type === 'BORDA' || !c.type));
+
+    return bordas.find(b => {
+      const bNorm = normalize(b.name);
+      return bNorm.includes(target) || target.includes(bNorm);
+    });
   };
 
   const handleSend = async (textOverride?: string) => {
-    const userMsg = textOverride || input;
-    if (!userMsg.trim()) return;
+    const userMsg = (textOverride || input).trim();
+    if (!userMsg || isTyping) return;
 
-    setMessages(prev => [...prev, { text: userMsg, isUser: true }]);
+    const userMessageObj: ChatMessage = {
+      id: Math.random().toString(36).substring(7),
+      text: userMsg,
+      isUser: true,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessageObj]);
     setInput('');
     setIsTyping(true);
 
     try {
-      if (!chatSessionRef.current) throw new Error("Chat não inicializado");
+      // Monta histórico de mensagens para a API
+      const historyPayload = messages.map(m => ({
+        role: m.isUser ? 'user' : 'model',
+        content: m.text
+      }));
+      historyPayload.push({ role: 'user', content: userMsg });
 
-      let response = await chatSessionRef.current.sendMessage({ message: userMsg });
-      
-      // Processa chamadas de função (Function Calling)
-      // O SDK @google/genai lida com function calls de forma diferente do SDK antigo.
-      // Precisamos verificar se há chamadas de função na resposta.
-      
-      const functionCalls = response.functionCalls;
-      
-      if (functionCalls && functionCalls.length > 0) {
-        const functionResponses = [];
-        
-        for (const call of functionCalls) {
-          let result;
-          if (call.name === 'addToCart') {
-            const args = call.args as any;
-            result = handleAddToCartTool(args.productName, args.quantity);
-          } else if (call.name === 'getMenu') {
-             result = { menu: products.map(p => p.name).join(', ') };
-          }
+      // Dados de contexto completos da loja
+      const storeContext = {
+        storeName,
+        isStoreOpen,
+        storeHours,
+        deliveryFee,
+        zipRanges,
+        products: products.map(p => ({
+          name: p.name,
+          category: p.category,
+          price: p.price,
+          description: p.description,
+          outOfStock: p.outOfStock,
+          hidden: p.hidden
+        })),
+        complements: complements.map(c => ({
+          name: c.name,
+          price: c.price,
+          active: c.active,
+          type: c.type || 'BORDA'
+        })),
+        coupons: coupons.map(cp => ({
+          code: cp.code,
+          discount: cp.discount,
+          type: cp.type,
+          active: cp.active
+        })),
+        paymentMethods: paymentMethods.filter(p => p.enabled).map(p => p.name),
+        socialLinks,
+        cart,
+        currentUser: currentUser ? { name: currentUser.name, email: currentUser.email } : null,
+        botSettings
+      };
 
-          functionResponses.push({
-            name: call.name,
-            response: { result: result }
-          });
-        }
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: historyPayload,
+          storeContext,
+          customApiKey: botSettings?.geminiApiKey
+        })
+      });
 
-        // Envia o resultado da função de volta para o modelo
-        response = await chatSessionRef.current.sendMessage(functionResponses);
+      const data = await response.json();
+
+      if (!response.ok || !data.text) {
+        throw new Error(data.error || 'Erro de comunicação');
       }
 
-      const botText = response.text || "Desculpe, tive um problema técnico. Pode tentar novamente?";
-      setMessages(prev => [...prev, { text: botText, isUser: false }]);
+      let rawResponse: string = data.text;
+      let detectedItem: { name: string; quantity: number; price: number; borda?: string } | undefined = undefined;
 
-    } catch (error) {
-      console.error("Erro no chat:", error);
-      setMessages(prev => [...prev, { text: "Ops! Tive um problema de conexão. Tente novamente em instantes.", isUser: false }]);
+      // Detecta comandos de ação [ADD_TO_CART: {...}]
+      const actionMatch = rawResponse.match(/\[ADD_TO_CART:\s*(\{.*?\})\s*\]/);
+      if (actionMatch && actionMatch[1]) {
+        try {
+          const actionData = JSON.parse(actionMatch[1]);
+          const matchedProduct = findProductMatch(actionData.productName);
+
+          if (matchedProduct) {
+            const quantity = Number(actionData.quantity) || 1;
+            const matchedBorda = findBordaMatch(actionData.borda);
+
+            onAddToCart(
+              matchedProduct,
+              quantity,
+              undefined,
+              undefined,
+              matchedBorda ? { selectedBorda: matchedBorda } : undefined
+            );
+
+            detectedItem = {
+              name: matchedProduct.name,
+              quantity,
+              price: matchedProduct.price,
+              borda: matchedBorda ? matchedBorda.name : undefined
+            };
+          }
+        } catch (parseErr) {
+          console.warn('Erro ao processar tag ADD_TO_CART:', parseErr);
+        }
+
+        // Limpa a tag da mensagem visível ao usuário
+        rawResponse = rawResponse.replace(/\[ADD_TO_CART:\s*\{.*?\}\s*\]/g, '').trim();
+      }
+
+      const botMessageObj: ChatMessage = {
+        id: Math.random().toString(36).substring(7),
+        text: rawResponse,
+        isUser: false,
+        addedItem: detectedItem,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, botMessageObj]);
+
+      if (!isOpen) {
+        setHasNewMessageBadge(true);
+      }
+
+    } catch (err: any) {
+      console.error('[ChatBot] Erro ao conversar:', err);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(7),
+          text: 'Puxa, tive uma instabilidade momentânea na conexão 🍕. Você pode tentar novamente ou se preferir pode adicionar seu pedido diretamente pelo cardápio!',
+          isUser: false,
+          timestamp: new Date()
+        }
+      ]);
     } finally {
       setIsTyping(false);
     }
   };
 
+  const quickPrompts = [
+    '🍕 Sugestão do Chef',
+    '🧀 Quais as bordas recheadas?',
+    '🛵 Quanto é a taxa de entrega?',
+    '⏰ Quais os horários de funcionamento?',
+    '🎟️ Tem algum cupom de desconto?',
+    '🥤 Quais bebidas estão disponíveis?'
+  ];
+
+  if (botSettings && botSettings.enabled === false) {
+    return null;
+  }
+
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(!isOpen)} 
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-110 transition-transform active:scale-95"
+      {/* Botão Flutuante */}
+      <button
+        id="btn-bellabot-toggle"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setHasNewMessageBadge(false);
+        }}
+        className="fixed bottom-6 right-6 z-50 group flex items-center gap-3 bg-red-600 hover:bg-red-700 text-white p-3.5 sm:px-5 sm:py-3.5 rounded-full shadow-2xl hover:shadow-red-600/50 transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white/20"
+        aria-label="Abrir BellaBot Atendente Virtual"
       >
-        {isOpen ? '✕' : '💬'}
+        <div className="relative">
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg shadow-inner">
+            🤖
+          </div>
+          {/* Indicador pulsante */}
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border border-white"></span>
+          </span>
+        </div>
+
+        <div className="hidden sm:flex flex-col text-left">
+          <span className="text-xs font-black uppercase tracking-wider leading-none flex items-center gap-1.5">
+            {botName} IA <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
+          </span>
+          <span className="text-[10px] text-red-100 font-bold leading-tight mt-0.5">
+            Atendente Virtual 24h
+          </span>
+        </div>
+
+        {hasNewMessageBadge && (
+          <span className="w-3 h-3 bg-amber-400 rounded-full animate-bounce shadow-md"></span>
+        )}
       </button>
 
+      {/* Janela do Chat */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-[32px] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[500px] animate-in slide-in-from-bottom-10 duration-300">
-          <div className="bg-red-600 p-4 flex items-center justify-between">
+        <div
+          id="modal-bellabot-window"
+          className="fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-32px)] sm:w-[420px] max-w-[440px] bg-white rounded-[32px] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[560px] max-h-[85vh] animate-in slide-in-from-bottom-6 duration-300"
+        >
+          {/* Cabeçalho */}
+          <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 sm:p-5 flex items-center justify-between text-white shadow-md">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-sm border-2 border-red-100">🤖</div>
+              <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-2xl shadow-md border-2 border-red-100">
+                🤖
+              </div>
               <div>
-                <h3 className="font-black text-white uppercase text-sm tracking-wide">BellaBot IA</h3>
-                <p className="text-[10px] text-red-100 font-bold uppercase tracking-widest flex items-center gap-1">
-                  <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span> Online
+                <h3 className="font-black text-white uppercase text-sm tracking-wide flex items-center gap-2">
+                  {botName} IA
+                  <span className="text-[9px] bg-white/20 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/20">
+                    IA Gemini
+                  </span>
+                </h3>
+                <p className="text-[11px] text-red-100 font-bold flex items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                  {isStoreOpen ? 'Atendendo agora • Loja Aberta' : 'Atendendo agora • Loja Fechada'}
                 </p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white hover:bg-red-700 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
+
+            <button
+              id="btn-close-bellabot"
+              onClick={() => setIsOpen(false)}
+              className="text-white/80 hover:text-white hover:bg-white/20 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+              title="Fechar chat"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 scroll-smooth">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                <div className={`max-w-[85%] p-3.5 rounded-2xl text-xs font-medium leading-relaxed shadow-sm ${
-                  msg.isUser 
-                    ? 'bg-red-600 text-white rounded-br-none' 
-                    : 'bg-white text-slate-700 border border-slate-200 rounded-bl-none'
-                }`}>
+          {/* Área de Mensagens */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-slate-50 scroll-smooth">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${msg.isUser ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+              >
+                <div
+                  className={`max-w-[88%] p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm whitespace-pre-wrap ${
+                    msg.isUser
+                      ? 'bg-red-600 text-white rounded-br-none font-medium'
+                      : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none font-normal'
+                  }`}
+                >
                   {msg.text}
                 </div>
+
+                {/* Card de confirmação de item adicionado */}
+                {msg.addedItem && (
+                  <div className="mt-2 w-[88%] bg-emerald-50 border-2 border-emerald-300/80 rounded-2xl p-3 shadow-sm flex items-center justify-between gap-2 animate-in zoom-in-95 duration-200">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm shrink-0 shadow-sm">
+                        <Check className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-emerald-900 truncate">
+                          {msg.addedItem.quantity}x {msg.addedItem.name}
+                        </p>
+                        <p className="text-[10px] font-bold text-emerald-700">
+                          {msg.addedItem.borda ? `+ Borda ${msg.addedItem.borda} • ` : ''}
+                          R$ {(msg.addedItem.price * msg.addedItem.quantity).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        onOpenCart?.();
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0 shadow-sm transition-all"
+                    >
+                      <ShoppingCart className="w-3 h-3" />
+                      <span>Carrinho</span>
+                    </button>
+                  </div>
+                )}
+
+                <span className="text-[9px] text-slate-400 mt-1 px-1">
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             ))}
+
             {isTyping && (
-              <div className="flex justify-start animate-in fade-in">
-                <div className="bg-white border border-slate-200 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1 items-center h-10">
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+              <div className="flex items-center gap-2 text-slate-500 animate-in fade-in">
+                <div className="bg-white border border-slate-200 px-4 py-3 rounded-2xl rounded-bl-none shadow-sm flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-red-600 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-2 h-2 bg-red-600 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-2 h-2 bg-red-600 rounded-full animate-bounce"></span>
+                  <span className="text-[11px] font-bold text-slate-500 ml-2">Digitando resposta...</span>
                 </div>
               </div>
             )}
+
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex gap-2 overflow-x-auto no-scrollbar">
-            {['Ver Cardápio', 'Qual a taxa de entrega?', 'Quero um X-Tudo', 'Horário de funcionamento'].map(opt => (
-              <button 
-                key={opt} 
-                onClick={() => handleSend(opt)}
-                className="whitespace-nowrap px-3 py-1.5 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm active:scale-95"
+          {/* Sugestões Rápidas */}
+          <div className="px-3 py-2 bg-slate-100 border-t border-slate-200/80 flex gap-2 overflow-x-auto no-scrollbar">
+            {quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => handleSend(prompt)}
+                disabled={isTyping}
+                className="whitespace-nowrap px-3 py-1.5 bg-white border border-slate-200 hover:border-red-400 hover:bg-red-50 hover:text-red-700 text-slate-700 rounded-full text-[11px] font-bold shadow-xs transition-all active:scale-95 disabled:opacity-50"
               >
-                {opt}
+                {prompt}
               </button>
             ))}
           </div>
 
-          <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
-            <input 
-              type="text" 
-              value={input} 
-              onChange={e => setInput(e.target.value)} 
-              onKeyPress={e => e.key === 'Enter' && handleSend()}
-              placeholder="Digite sua mensagem..." 
+          {/* Campo de Envio */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="p-3 sm:p-4 bg-white border-t border-slate-200 flex items-center gap-2"
+          >
+            <input
+              id="input-bellabot-message"
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Digite aqui sua dúvida ou pedido..."
               disabled={isTyping}
-              className="flex-1 bg-slate-100 border-none rounded-xl px-4 py-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 outline-none disabled:opacity-50 transition-all"
+              className="flex-1 bg-slate-100 hover:bg-slate-50 focus:bg-white border border-transparent focus:border-red-400 rounded-2xl px-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition-all"
             />
-            <button 
-              onClick={() => handleSend()} 
+            <button
+              id="btn-bellabot-send"
+              type="submit"
               disabled={isTyping || !input.trim()}
-              className="bg-red-600 text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-900/10 active:scale-95"
+              className="w-11 h-11 bg-red-600 hover:bg-red-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-2xl flex items-center justify-center transition-all shadow-md shadow-red-600/20 active:scale-95 disabled:cursor-not-allowed"
+              title="Enviar mensagem"
             >
-              ➤
+              <Send className="w-4 h-4" />
             </button>
-          </div>
+          </form>
         </div>
       )}
     </>

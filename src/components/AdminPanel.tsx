@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Order, Customer, ZipRange, CategoryItem, SubCategoryItem, OrderStatus, Complement, PaymentSettings, Coupon, Table } from '../types.ts';
+import { Product, Order, Customer, ZipRange, CategoryItem, SubCategoryItem, OrderStatus, Complement, PaymentSettings, Coupon, Table, BotSettings } from '../types.ts';
 import { compressImage } from '../services/imageService.ts';
 import { dbService } from '../services/dbService.ts';
 import { writeBatch, doc } from 'firebase/firestore';
 import { PizzaPricingCalculator } from "./PizzaPricingCalculator.tsx";
 import { WeeklyPizzaSuggestions } from "./WeeklyPizzaSuggestions.tsx";
-import { Eye, EyeOff } from 'lucide-react';
+import { BellaBotAdmin } from "./BellaBotAdmin.tsx";
+import { Eye, EyeOff, Bot, Sparkles, Send, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { printOrderReceipt } from '../utils/printReceipt.ts';
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
@@ -111,9 +112,11 @@ interface AdminPanelProps {
   onWaiterMode?: () => void;
   storeHours: Record<number, { enabled: boolean; open: string; close: string }>;
   onUpdateStoreHours: (hours: Record<number, { enabled: boolean; open: string; close: string }>) => void;
+  botSettings?: BotSettings;
+  onUpdateBotSettings: (settings: BotSettings) => void;
 }
 
-type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'ajustes';
+type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'bellabot' | 'ajustes';
 
 type DeleteTarget = {
   type: 'ORDER' | 'PRODUCT' | 'CATEGORY' | 'SUBCATEGORY' | 'COMPLEMENT' | 'COUPON' | 'ZIP' | 'PAYMENT' | 'TABLE';
@@ -131,7 +134,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     paymentSettings, onTogglePaymentMethod, onAddPaymentMethod, onRemovePaymentMethod, onUpdatePaymentSettings,
     authSettings, onUpdateAuthSettings,
     paymentConfig, onUpdatePaymentConfig,
-    storeHours, onUpdateStoreHours
+    storeHours, onUpdateStoreHours,
+    botSettings, onUpdateBotSettings
   } = props;
 
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
@@ -222,6 +226,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [localPagSeguroEmail, setLocalPagSeguroEmail] = useState(paymentConfig?.pagseguroEmail || '');
   const [localPagSeguroToken, setLocalPagSeguroToken] = useState(paymentConfig?.pagseguroToken || '');
 
+  // --- BELLABOT IA ESTADOS ---
+  const [localBotSettings, setLocalBotSettings] = useState<BotSettings>(botSettings || {
+    enabled: true,
+    botName: 'BellaBot',
+    customPrompt: 'Você é a BellaBot, atendente e especialista em pizzas artesanais e bordas recheadas da Bella Borda. Seja alegre, prestativa e use emojis de pizza 🍕🧀🥤. Sempre sugira borda recheada doce ou salgada e uma bebida refrescante. Nunca deixe o cliente sair sem pedir: seja persuasiva com carinho, ofereça opções mais acessíveis se ele achar caro e informe sobre cupons ativos.',
+    promoNotice: 'Peça hoje sua pizza grande e ganhe desconto especial na borda vulcão recheada!',
+    extraInfo: 'Nossa massa é 100% artesanal italiana com longa fermentação de 48h. Entregamos quentinho e rápido.',
+    salesPushEnabled: true,
+    geminiApiKey: ''
+  });
+  const [botSaveSuccess, setBotSaveSuccess] = useState(false);
+  const [botTesting, setBotTesting] = useState(false);
+  const [botTestResult, setBotTestResult] = useState<{ success: boolean; text: string } | null>(null);
+  const [showBotApiKey, setShowBotApiKey] = useState(false);
+  const [testUserQuery, setTestUserQuery] = useState('');
+  const [testSimulating, setTestSimulating] = useState(false);
+  const [testChatMessages, setTestChatMessages] = useState<{ isUser: boolean; text: string }[]>([
+    { isUser: false, text: 'Olá! Sou a BellaBot no simulador de testes do painel. Faça uma pergunta como se fosse um cliente para testar minhas respostas!' }
+  ]);
+
   const [isImporting, setIsImporting] = useState(false);
   const [importLog, setImportLog] = useState('');
   const [tableName, setTableName] = useState('');
@@ -253,6 +277,113 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   useEffect(() => {
     setLocalStoreName(storeName || 'BELLA BORDA');
   }, [storeName]);
+
+  useEffect(() => {
+    if (botSettings) {
+      setLocalBotSettings(botSettings);
+    }
+  }, [botSettings]);
+
+  const handleSaveBotSettings = () => {
+    onUpdateBotSettings(localBotSettings);
+    setBotSaveSuccess(true);
+    setTimeout(() => setBotSaveSuccess(false), 3500);
+  };
+
+  const handleTestConnection = async () => {
+    setBotTesting(true);
+    setBotTestResult(null);
+    try {
+      const res = await fetch('/api/test-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customApiKey: localBotSettings.geminiApiKey })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBotTestResult({ success: true, text: data.reply || 'Conexão com a Inteligência Artificial Gemini realizada com sucesso!' });
+      } else {
+        setBotTestResult({ success: false, text: data.error || 'Falha ao conectar com o Gemini.' });
+      }
+    } catch (e: any) {
+      setBotTestResult({ success: false, text: e.message || 'Erro ao tentar comunicação com o servidor.' });
+    } finally {
+      setBotTesting(false);
+    }
+  };
+
+  const handleSimulateChat = async () => {
+    if (!testUserQuery.trim() || testSimulating) return;
+    const q = testUserQuery.trim();
+    setTestUserQuery('');
+    setTestChatMessages(prev => [...prev, { isUser: true, text: q }]);
+    setTestSimulating(true);
+
+    try {
+      const history = testChatMessages.map(m => ({
+        role: m.isUser ? 'user' : 'model',
+        content: m.text
+      }));
+      history.push({ role: 'user', content: q });
+
+      const storeContext = {
+        storeName: localStoreName || storeName,
+        isStoreOpen,
+        storeHours: localStoreHours,
+        deliveryFee: zipRanges.length > 0 ? zipRanges[0].fee : 5.0,
+        zipRanges,
+        products: products.map(p => ({
+          name: p.name,
+          category: p.category,
+          price: p.price,
+          description: p.description,
+          outOfStock: p.outOfStock,
+          hidden: p.hidden
+        })),
+        complements: complements.map(c => ({
+          name: c.name,
+          price: c.price,
+          active: c.active,
+          type: c.type || 'BORDA'
+        })),
+        coupons: coupons.map(cp => ({
+          code: cp.code,
+          discount: cp.discount,
+          type: cp.type,
+          active: cp.active
+        })),
+        paymentMethods: paymentSettings.filter(p => p.enabled).map(p => p.name),
+        socialLinks: {
+          whatsapp: localWhatsapp,
+          address: localAddress,
+          city: localCity,
+          orderEstimatedMinutes: Number(localOrderMinutes) || 35
+        },
+        botSettings: localBotSettings
+      };
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: history,
+          storeContext,
+          customApiKey: localBotSettings.geminiApiKey
+        })
+      });
+
+      const data = await res.json();
+      if (data.text) {
+        setTestChatMessages(prev => [...prev, { isUser: false, text: data.text }]);
+      } else {
+        setTestChatMessages(prev => [...prev, { isUser: false, text: `Erro: ${data.error || 'Sem resposta'}` }]);
+      }
+    } catch (err: any) {
+      setTestChatMessages(prev => [...prev, { isUser: false, text: `Erro ao simular: ${err.message}` }]);
+    } finally {
+      setTestSimulating(false);
+    }
+  };
 
   useEffect(() => {
     setLocalAdminUser(authSettings.adminUser);
@@ -568,6 +699,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           <NavItem active={activeView === 'clientes'} icon="👥" label="Clientes" onClick={() => setActiveView('clientes')} />
           <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => setActiveView('pagamentos')} />
           <NavItem active={activeView === 'horarios'} icon="⏰" label="Horários" onClick={() => setActiveView('horarios')} />
+          <NavItem active={activeView === 'bellabot'} icon="🤖" label="BellaBot IA" onClick={() => setActiveView('bellabot')} />
           <NavItem active={activeView === 'ajustes'} icon="⚙️" label="Ajustes" onClick={() => setActiveView('ajustes')} />
         </nav>
 
@@ -584,9 +716,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
            <div className="flex items-center gap-6">
               <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
                 <span className="p-2.5 bg-slate-800 text-slate-200 rounded-xl text-xl border border-slate-700 shadow-sm">
-                  {activeView === 'dashboard' ? '📊' : activeView === 'pedidos' ? '🛍️' : activeView === 'precificacao' ? '🍕' : activeView === 'sugestoes' ? '📅' : '⚙️'}
+                  {activeView === 'dashboard' ? '📊' : activeView === 'pedidos' ? '🛍️' : activeView === 'precificacao' ? '🍕' : activeView === 'sugestoes' ? '📅' : activeView === 'bellabot' ? '🤖' : '⚙️'}
                 </span>
-                {activeView === 'sugestoes' ? 'Pizza da Semana (WhatsApp & Instagram)' : activeView}
+                {activeView === 'sugestoes' ? 'Pizza da Semana (WhatsApp & Instagram)' : activeView === 'bellabot' ? 'BellaBot IA (Atendimento & Vendas)' : activeView}
               </h1>
               <button onClick={onToggleMaintenance} className={`hidden md:flex items-center gap-3 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${isMaintenanceMode ? 'bg-amber-600/10 border-amber-500 text-amber-500 hover:bg-amber-600/20' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800/80'}`}>
                 <div className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`}></div>
@@ -1661,6 +1793,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                      </div>
                   </div>
                </div>
+            )}
+
+            {activeView === 'bellabot' && (
+              <BellaBotAdmin
+                botSettings={localBotSettings}
+                onUpdateBotSettings={(newSettings) => {
+                  setLocalBotSettings(newSettings);
+                  onUpdateBotSettings(newSettings);
+                }}
+                products={products}
+                complements={complements}
+                coupons={coupons}
+                zipRanges={zipRanges}
+                storeHours={localStoreHours}
+                paymentSettings={paymentSettings}
+                isStoreOpen={isStoreOpen}
+                storeName={localStoreName || storeName}
+                socialLinks={{
+                  whatsapp: localWhatsapp,
+                  address: localAddress,
+                  city: localCity,
+                  orderEstimatedMinutes: Number(localOrderMinutes) || 35
+                }}
+              />
             )}
 
             {activeView === 'ajustes' && (

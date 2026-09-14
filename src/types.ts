@@ -144,3 +144,14 @@ export interface DailyPizzaSuggestion {
   customMessage?: string;
   updatedAt?: string;
 }
+
+export interface BotSettings {
+  enabled: boolean;
+  botName: string;
+  customPrompt: string;
+  promoNotice: string;
+  extraInfo: string;
+  salesPushEnabled: boolean;
+  geminiApiKey?: string;
+}
+

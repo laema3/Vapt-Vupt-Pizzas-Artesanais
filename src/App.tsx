@@ -23,9 +23,19 @@ import { RecessoBanner } from './components/RecessoBanner.tsx';
 import { dbService } from './services/dbService.ts';
 import { connectionError } from './firebaseConfig';
 import { calculateDeliveryFeeForZip } from './utils/zipUtils.ts';
-import { Product, CartItem, Order, Customer, ZipRange, PaymentSettings, CategoryItem, SubCategoryItem, Complement, DeliveryType, Coupon, Table } from './types.ts';
+import { Product, CartItem, Order, Customer, ZipRange, PaymentSettings, CategoryItem, SubCategoryItem, Complement, DeliveryType, Coupon, Table, BotSettings } from './types.ts';
 import { safeStorage } from './utils/safeStorage.ts';
 import { DEFAULT_LOGO } from './constants.tsx';
+
+const DEFAULT_BOT_SETTINGS: BotSettings = {
+  enabled: true,
+  botName: 'BellaBot',
+  customPrompt: 'Você é a BellaBot, atendente e especialista em pizzas artesanais com bordas recheadas da Bella Borda. Seja alegre, simpática e use emojis de pizza 🍕🧀🥤. Sempre sugira borda recheada doce ou salgada e uma bebida refrescante. Nunca deixe o cliente sair sem pedir: seja persuasiva com carinho, ofereça opções mais acessíveis se ele achar caro e informe sobre cupons ativos.',
+  promoNotice: 'Peça hoje sua pizza grande e experimente nossas bordas vulcão recheadas com Catupiry original!',
+  extraInfo: 'Nossa massa é 100% artesanal com longa fermentação de 48h. Entregamos quentinho e rápido.',
+  salesPushEnabled: true,
+  geminiApiKey: ''
+};
 
 const CustomerOrders = React.lazy(() => import('./components/CustomerOrders.tsx').then(m => ({ default: m.CustomerOrders })));
 const MotoboyPortal = React.lazy(() => import('./components/MotoboyPortal.tsx').then(m => ({ default: m.MotoboyPortal })));
@@ -163,6 +173,15 @@ const App: React.FC = () => {
     adminPass: 'admin123',
     motoboyPass: 'motoboy123',
     waiterPass: 'garcom123'
+  });
+
+  const [botSettings, setBotSettings] = useState<BotSettings>(() => {
+    try {
+      const saved = safeStorage.getItem('nl_bot_settings');
+      return saved ? JSON.parse(saved) : DEFAULT_BOT_SETTINGS;
+    } catch {
+      return DEFAULT_BOT_SETTINGS;
+    }
   });
 
   const [showAdminPanel, setShowAdminPanel] = useState(() => safeStorage.getSessionItem('nl_admin_auth') === 'true');
@@ -416,6 +435,10 @@ const App: React.FC = () => {
             };
             console.log("[App] Atualizando paymentConfig via subscribe:", newPaymentConfig);
             setPaymentConfig(newPaymentConfig);
+            if (settings.botSettings) {
+              setBotSettings(prev => ({ ...prev, ...settings.botSettings }));
+              safeStorage.setItem('nl_bot_settings', JSON.stringify({ ...DEFAULT_BOT_SETTINGS, ...settings.botSettings }));
+            }
           }
           const auth = data.find(d => d.id === 'auth');
           if (auth) {
@@ -529,6 +552,9 @@ const App: React.FC = () => {
                         console.log("Fallback: Atualizando config. Token MP:", !!newConfig.mercadopagoAccessToken);
                         return newConfig;
                     });
+                    if (settings.botSettings) {
+                        setBotSettings(prev => ({ ...prev, ...settings.botSettings }));
+                    }
                 }
                 const auth = s.find(d => d.id === 'auth');
                 if (auth) {
@@ -1286,6 +1312,12 @@ const App: React.FC = () => {
               setStoreHours(hours);
               dbService.save('settings', 'general', { storeHours: hours });
             }}
+            botSettings={botSettings}
+            onUpdateBotSettings={(newBotSettings) => {
+              setBotSettings(newBotSettings);
+              safeStorage.setItem('nl_bot_settings', JSON.stringify(newBotSettings));
+              dbService.save('settings', 'general', { botSettings: newBotSettings });
+            }}
             onLogout={() => { 
               setShowAdminPanel(false); 
               setIsAdminAuthenticated(false);
@@ -1619,7 +1651,27 @@ const App: React.FC = () => {
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
       }} isKioskMode={isKioskMode} />
 
-      {!showAdminPanel && !isKioskMode && <ChatBot products={products} cart={cart} deliveryFee={currentDeliveryFee} isStoreOpen={isStoreOpen} currentUser={currentUser} onAddToCart={handleAddToCart} socialLinks={socialLinks} />}
+      {!showAdminPanel && !isKioskMode && (
+        <ChatBot 
+          products={products} 
+          categories={categories}
+          subCategories={subCategories}
+          complements={complements}
+          zipRanges={zipRanges}
+          coupons={coupons}
+          storeHours={storeHours}
+          paymentMethods={paymentMethods}
+          cart={cart} 
+          deliveryFee={currentDeliveryFee} 
+          isStoreOpen={isStoreOpen} 
+          currentUser={currentUser} 
+          onAddToCart={handleAddToCart} 
+          socialLinks={socialLinks} 
+          botSettings={botSettings}
+          storeName={storeName}
+          onOpenCart={() => setIsCartOpen(true)}
+        />
+      )}
       {!showAdminPanel && !isKioskMode && <InstallBanner logoUrl={logoUrl} />}
 
       {isMaintenanceMode && !isAdminAuthenticated && (

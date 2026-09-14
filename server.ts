@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
+import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
@@ -279,23 +281,289 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is healthy' });
 });
 
-// Endpoint dedicado para servir a logomarca para OpenGraph / WhatsApp / Redes Sociais
-app.get(['/logo.jpg', '/og-image.jpg', '/logo.png'], (req, res, next) => {
-  const isJpg = req.path.endsWith('.jpg');
-  const primaryFile = isJpg ? 'logo.jpg' : 'logo.png';
-  const fallbackFile = isJpg ? 'logo.png' : 'logo.jpg';
-  
-  const primaryPath = path.resolve('public', primaryFile);
-  const fallbackPath = path.resolve('public', fallbackFile);
+// --- ENDPOINTS BELLABOT IA (GEMINI API) ---
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { messages, storeContext, customApiKey } = req.body;
+    const apiKey = (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10)
+      ? customApiKey.trim()
+      : process.env.GEMINI_API_KEY;
 
-  if (fs.existsSync(primaryPath)) {
-    res.setHeader('Content-Type', isJpg ? 'image/jpeg' : 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.sendFile(primaryPath);
-  } else if (fs.existsSync(fallbackPath)) {
-    res.setHeader('Content-Type', isJpg ? 'image/png' : 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.sendFile(fallbackPath);
+    if (!apiKey) {
+      return res.status(500).json({
+        error: 'Chave de API Gemini não configurada no servidor. Configure a chave no Painel ou nas variáveis de ambiente.'
+      });
+    }
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Nenhuma mensagem enviada' });
+    }
+
+    const {
+      storeName = 'Bella Borda Pizzaria',
+      isStoreOpen = true,
+      storeHours = null,
+      deliveryFee = 5.0,
+      zipRanges = [],
+      products = [],
+      complements = [],
+      coupons = [],
+      paymentMethods = [],
+      socialLinks = {},
+      cart = [],
+      currentUser = null,
+      botSettings = {}
+    } = storeContext || {};
+
+    const botName = botSettings.botName || 'BellaBot';
+    const customPrompt = botSettings.customPrompt || '';
+    const promoNotice = botSettings.promoNotice || '';
+    const extraInfo = botSettings.extraInfo || '';
+    const salesPushEnabled = botSettings.salesPushEnabled !== false;
+
+    // Formatar Cardápio
+    const menuSummary = products
+      .filter((p: any) => !p.hidden)
+      .map((p: any) => {
+        const stockStatus = p.outOfStock ? ' [ESGOTADO NO MOMENTO]' : '';
+        const desc = p.description ? ` - ${p.description}` : '';
+        return `• ${p.name} (${p.category || 'Geral'}): R$ ${Number(p.price).toFixed(2)}${stockStatus}${desc}`;
+      })
+      .join('\n');
+
+    // Formatar Bordas e Adicionais
+    const bordas = complements
+      .filter((c: any) => c.active && (c.type === 'BORDA' || !c.type))
+      .map((c: any) => `• Borda ${c.name}: + R$ ${Number(c.price).toFixed(2)}`)
+      .join('\n');
+
+    const adicionais = complements
+      .filter((c: any) => c.active && c.type === 'ADICIONAL')
+      .map((c: any) => `• Adicional ${c.name}: + R$ ${Number(c.price).toFixed(2)}`)
+      .join('\n');
+
+    // Formatar Cupons
+    const cuponsAtivos = coupons
+      .filter((cp: any) => cp.active)
+      .map((cp: any) => `• Cupom ${cp.code}: ${cp.type === 'PERCENT' ? `${cp.discount}% de desconto` : `R$ ${Number(cp.discount).toFixed(2)} de desconto`}`)
+      .join('\n');
+
+    // Formatar Formas de Pagamento
+    const formasPagamento = paymentMethods && paymentMethods.length > 0
+      ? paymentMethods.join(', ')
+      : 'Pix, Cartão de Crédito, Cartão de Débito, Dinheiro';
+
+    // Formatar Bairros/Taxas
+    const taxasBairros = zipRanges && zipRanges.length > 0
+      ? zipRanges.map((z: any) => `• CEP ${z.start} a ${z.end}: R$ ${Number(z.fee).toFixed(2)}`).join('\n')
+      : `Taxa base de entrega: R$ ${Number(deliveryFee).toFixed(2)}`;
+
+    // Formatar Horários
+    const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    let horariosTexto = '';
+    if (storeHours && typeof storeHours === 'object') {
+      horariosTexto = Object.entries(storeHours).map(([dayIdx, info]: [string, any]) => {
+        const dName = diasSemana[Number(dayIdx)] || `Dia ${dayIdx}`;
+        if (!info || !info.enabled) return `• ${dName}: Fechado`;
+        return `• ${dName}: ${info.open} às ${info.close}`;
+      }).join('\n');
+    } else {
+      horariosTexto = '• Terça a Domingo: 18:00 às 23:30 (Segunda-feira fechado)';
+    }
+
+    // Formatar Carrinho atual do cliente
+    let cartTexto = 'Carrinho vazio no momento.';
+    if (cart && cart.length > 0) {
+      cartTexto = cart.map((item: any) => `${item.quantity}x ${item.name} (R$ ${(item.price * item.quantity).toFixed(2)})`).join(', ');
+    }
+
+    const systemInstruction = `
+Você é ${botName}, a assistente virtual e especialista em pizzas artesanais e atendimento da pizzaria "${storeName}".
+Você é calorosa, muito educada, ágil, prestativa e apaixonada por pizzas irresistíveis com bordas recheadas. Use sempre uma linguagem acolhedora com emojis temáticos (🍕, 🧀, 🥤, ✨, 🛵, ❤️).
+
+DADOS OFICIAIS E EM TEMPO REAL DA PIZZARIA:
+- Nome da Loja: ${storeName}
+- Status da Loja AGORA: ${isStoreOpen ? 'ABERTA E RECEBENDO PEDIDOS! ✅' : 'FECHADA NO MOMENTO ⏸️ (mas o cliente pode consultar o cardápio e montar o pedido)'}
+- Horários de Funcionamento:
+${horariosTexto}
+- Tempo Médio de Entrega: ${socialLinks.orderEstimatedMinutes || 35} a ${(Number(socialLinks.orderEstimatedMinutes) || 35) + 15} minutos.
+- Formas de Pagamento Aceitas: ${formasPagamento}.
+- Endereço / Localização: ${socialLinks.address || 'Uberaba - MG'}, ${socialLinks.city || 'Uberaba'}.
+- WhatsApp / Contato: ${socialLinks.whatsapp || 'Disponível no topo do site'}.
+- Taxa de Entrega:
+${taxasBairros}
+
+CARDÁPIO DE PRODUTOS CADASTRADOS (ATUALIZADO):
+${menuSummary || 'Pizzas artesanais tradicionais e especiais.'}
+
+BORDAS RECHEADAS DISPONÍVEIS:
+${bordas || 'Borda de Catupiry original, Cheddar cremoso, Chocolate, Nutella.'}
+
+ADICIONAIS DISPONÍVEIS:
+${adicionais || 'Bacon crocante, Queijo extra, Azeitonas pretas, Alho frito.'}
+
+CUPONS DE DESCONTO ATIVOS:
+${cuponsAtivos || 'Nenhum cupom público no momento, mas ofereça se o cliente hesitar.'}
+
+ESTADO ATUAL DO CLIENTE:
+- Nome do cliente: ${currentUser?.name || 'Cliente'}
+- Itens no carrinho do cliente: ${cartTexto}
+
+INSTRUÇÕES PERSONALIZADAS DEFINIDAS PELA GERÊNCIA:
+${customPrompt || 'Atenda com excelência e ajude o cliente na escolha do pedido.'}
+
+PROMOÇÕES E DESTAQUES DO DIA:
+${promoNotice || 'Destaque nossas pizzas com bordas especiais vulcão e refrigerantes geladinhos.'}
+
+INFORMAÇÕES EXTRAS E POLÍTICAS:
+${extraInfo || 'Massa de fermentação lenta com ingredientes selecionados.'}
+
+ESTRATÉGIA DE VENDAS E RETENÇÃO (MUITO IMPORTANTE):
+${salesPushEnabled ? `
+1. NUNCA DEIXE O CLIENTE IR EMBORA SEM PEDIR:
+   - Se o cliente disser que está apenas olhando, apresente uma sugestão irresistível do cardápio.
+   - Se achar caro ou demonstrar dúvida, ofereça uma opção mais em conta, tamanho menor, ou informe sobre cupom de desconto se houver.
+   - Mostre como é rápido e fácil pedir pelo site.
+2. UP-SELLING NATURAL (BORDAS E BEBIDAS):
+   - Ao sugerir ou quando o cliente escolher uma pizza, SEMPRE pergunte com entusiasmo qual borda recheada ele quer colocar (cite opções como Catupiry ou Nutella).
+   - Ofereça sempre uma bebida gelada para acompanhar (refrigerante, suco ou água).
+3. FECHAMENTO DIRETO DO PEDIDO (ADICIONAR AO CARRINHO):
+   - Quando o cliente expressar que quer pedir/adicionar um produto ao carrinho (ex: "Quero uma Calabresa", "adiciona um Guaraná", "pode mandar uma Pizza Portuguesa"), você DEVE confirmar alegremente e, NA ÚLTIMA LINHA da sua resposta, incluir a tag especial de ação:
+   [ADD_TO_CART:{"productName":"Nome Exato ou Mais Próximo do Cardápio","quantity":1,"borda":"Nome da Borda se solicitada"}]
+   Essa tag é lida pelo sistema para colocar o item automaticamente no carrinho do cliente sem ele precisar procurar no cardápio!
+` : ''}
+
+REGRAS GERAIS:
+- Seja sempre concisa: textos de chat diretos, fáceis de ler no celular, divididos em pequenos parágrafos ou bullet points.
+- Responda apenas com informações verdadeiras que constam no cardápio e nos dados acima. Não invente produtos que não estejam cadastrados.
+- Se o produto solicitado estiver com status [ESGOTADO NO MOMENTO], informe com gentileza e sugira uma alternativa similar do cardápio.
+`;
+
+    // Converte mensagens para o formato do Gemini
+    const contents = messages
+      .filter((m: any) => {
+        const text = String(m.content || m.text || '').trim();
+        return text.length > 0;
+      })
+      .map((m: any) => ({
+        role: (m.role === 'user' || m.isUser === true) ? 'user' : 'model',
+        parts: [{ text: String(m.content || m.text || '') }]
+      }));
+
+    // Garante que a lista não esteja vazia e que o último turno seja do usuário
+    if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
+      contents.push({
+        role: 'user',
+        parts: [{ text: 'Olá! Pode me ajudar com o cardápio e sugestões?' }]
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const CANDIDATE_MODELS = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    let lastError: any = null;
+    let responseText = '';
+
+    for (const modelName of CANDIDATE_MODELS) {
+      try {
+        const result = await ai.models.generateContent({
+          model: modelName,
+          contents,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+            maxOutputTokens: 800,
+          }
+        });
+        if (result && result.text) {
+          responseText = result.text;
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`[Gemini API] Falha no modelo ${modelName}:`, err.message);
+        lastError = err;
+      }
+    }
+
+    if (!responseText && lastError) {
+      throw lastError;
+    }
+
+    return res.json({
+      text: responseText,
+      success: true
+    });
+
+  } catch (error: any) {
+    console.error('Erro na rota /api/chat:', error);
+    return res.status(500).json({
+      error: 'Erro ao processar mensagem com a IA',
+      details: error.message
+    });
+  }
+});
+
+app.post('/api/test-gemini', async (req, res) => {
+  try {
+    const { customApiKey } = req.body;
+    const apiKey = (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10)
+      ? customApiKey.trim()
+      : process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({ success: false, error: 'Chave de API Gemini não encontrada.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const CANDIDATE_MODELS = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    let reply = '';
+    let usedModel = '';
+
+    for (const m of CANDIDATE_MODELS) {
+      try {
+        const result = await ai.models.generateContent({
+          model: m,
+          contents: 'Responda apenas: "BellaBot IA conectada com sucesso à Bella Borda Pizzaria! 🍕✨"'
+        });
+        if (result && result.text) {
+          reply = result.text.trim();
+          usedModel = m;
+          break;
+        }
+      } catch (e: any) {
+        console.warn(`[Test Gemini] Erro com ${m}:`, e.message);
+      }
+    }
+
+    if (!reply) {
+      return res.status(500).json({ success: false, error: 'Falha ao conectar com o modelo Gemini.' });
+    }
+
+    return res.json({ success: true, reply, model: usedModel });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint dedicado para servir a logomarca para OpenGraph / WhatsApp / Redes Sociais
+app.get(['/logo.jpg', '/og-image.jpg', '/logo.png', '/og-image.png', '/logo.webp', '/og-image.webp'], (req, res, next) => {
+  const isJpg = req.path.endsWith('.jpg');
+  const isPng = req.path.endsWith('.png');
+  const isWebp = req.path.endsWith('.webp');
+
+  const filePriority = isJpg 
+    ? ['logo.jpg', 'og-image.jpg', 'logo.png', 'logo.webp']
+    : isPng
+    ? ['logo.png', 'og-image.png', 'logo.jpg', 'logo.webp']
+    : ['logo.webp', 'og-image.webp', 'logo.png', 'logo.jpg'];
+
+  for (const filename of filePriority) {
+    const filePath = path.resolve('public', filename);
+    if (fs.existsSync(filePath)) {
+      const mime = filename.endsWith('.jpg') ? 'image/jpeg' : filename.endsWith('.png') ? 'image/png' : 'image/webp';
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(filePath);
+    }
   }
   next();
 });
@@ -306,17 +574,37 @@ app.post('/api/sync-logo', (req, res) => {
     const { logoUrl } = req.body;
     if (logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('data:image/')) {
       const parts = logoUrl.split(',');
+      const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
       const base64Data = parts[1];
       const buffer = Buffer.from(base64Data, 'base64');
       const publicDir = path.resolve('public');
       
-      fs.writeFileSync(path.join(publicDir, 'logo.jpg'), buffer);
-      fs.writeFileSync(path.join(publicDir, 'logo.png'), buffer);
+      const ext = mime.includes('webp') ? 'webp' : mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png';
+      const tempPath = path.join(publicDir, `logo-temp.${ext}`);
+      fs.writeFileSync(tempPath, buffer);
+      
+      try {
+        execSync(`convert "${tempPath}" -quality 95 "${path.join(publicDir, 'logo.jpg')}"`);
+        execSync(`convert "${tempPath}" "${path.join(publicDir, 'logo.png')}"`);
+        execSync(`convert "${tempPath}" -quality 95 "${path.join(publicDir, 'og-image.jpg')}"`);
+        execSync(`convert "${tempPath}" "${path.join(publicDir, 'logo.webp')}"`);
+        if (fs.existsSync(tempPath) && ext !== 'webp') {
+          fs.unlinkSync(tempPath);
+        }
+      } catch (convErr: any) {
+        console.warn('Conversão via ImageMagick ignorada:', convErr?.message);
+        fs.writeFileSync(path.join(publicDir, 'logo.jpg'), buffer);
+        fs.writeFileSync(path.join(publicDir, 'logo.png'), buffer);
+      }
       
       const distDir = path.resolve('dist');
       if (fs.existsSync(distDir)) {
-        fs.writeFileSync(path.join(distDir, 'logo.jpg'), buffer);
-        fs.writeFileSync(path.join(distDir, 'logo.png'), buffer);
+        try {
+          if (fs.existsSync(path.join(publicDir, 'logo.jpg'))) fs.copyFileSync(path.join(publicDir, 'logo.jpg'), path.join(distDir, 'logo.jpg'));
+          if (fs.existsSync(path.join(publicDir, 'logo.png'))) fs.copyFileSync(path.join(publicDir, 'logo.png'), path.join(distDir, 'logo.png'));
+        } catch (copyErr: any) {
+          console.warn('Cópia para dist ignorada:', copyErr?.message);
+        }
       }
       return res.json({ success: true, bytes: buffer.length });
     }

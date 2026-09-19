@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Customer, ZipRange } from '../types';
 import { dbService } from '../services/dbService';
-import { fetchAddressByCep } from '../utils/zipUtils';
+import { fetchAddressByCep, checkZipCoverage } from '../utils/zipUtils';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -74,25 +74,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, 
               <input type="tel" placeholder="Telefone (WhatsApp)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
               <input type="text" placeholder="Endereço Completo" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
               <input type="text" placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />
-              <input 
-                type="text" 
-                placeholder="CEP" 
-                value={zipCode} 
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  setZipCode(val);
-                  const clean = val.replace(/\D/g, '');
-                  if (clean.length === 8) {
-                    const res = await fetchAddressByCep(clean);
-                    if (res && res.address) {
-                      setAddress(res.address);
-                      if (res.neighborhood) setNeighborhood(res.neighborhood);
+              <div className="space-y-1">
+                <input 
+                  type="text" 
+                  placeholder="CEP (Ex: 38000-000)" 
+                  value={zipCode} 
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setZipCode(val);
+                    const clean = val.replace(/\D/g, '');
+                    if (clean.length === 8) {
+                      const res = await fetchAddressByCep(clean);
+                      if (res && res.address) {
+                        setAddress(res.address);
+                        if (res.neighborhood) setNeighborhood(res.neighborhood);
+                      }
                     }
-                  }
-                }} 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
-                required 
-              />
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
+                  required 
+                />
+                {zipCode.replace(/\D/g, '').length === 8 && zipRanges && zipRanges.length > 0 && (
+                  <div>
+                    {checkZipCoverage(zipCode, zipRanges).isCovered ? (
+                      <span className="text-[11px] font-bold text-emerald-600 block pl-1">
+                        ✅ CEP dentro da área de entrega (Frete: R$ {checkZipCoverage(zipCode, zipRanges).fee.toFixed(2)})
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-amber-600 block pl-1">
+                        ⚠️ Atenção: Este CEP está fora da nossa área de entrega (pedidos precisarão ser retirados no balcão).
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
           <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" required />

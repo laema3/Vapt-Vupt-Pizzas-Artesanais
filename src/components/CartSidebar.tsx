@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange } from '../types';
-import { calculateDeliveryFeeForZip, fetchAddressByCep } from '../utils/zipUtils';
+import { checkZipCoverage, fetchAddressByCep } from '../utils/zipUtils';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -99,14 +99,26 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
     }
   };
 
-  // Cálculo dinâmico do valor do frete
+  // Validação e cálculo dinâmico do valor do frete e cobertura de CEP
+  const zipCoverage = useMemo(() => {
+    if (deliveryType !== 'DELIVERY') return { isCovered: true, fee: 0 };
+    const targetZip = zipCode || currentUser?.zipCode || '';
+    if (!targetZip) return { isCovered: false, fee: 0 };
+    return checkZipCoverage(targetZip, zipRanges);
+  }, [deliveryType, zipCode, currentUser, zipRanges]);
+
+  const cleanCurrentZip = (zipCode || currentUser?.zipCode || '').replace(/\D/g, '');
+  const isZipOutOfArea = deliveryType === 'DELIVERY' && 
+                         cleanCurrentZip.length >= 8 && 
+                         zipRanges.length > 0 && 
+                         !zipCoverage.isCovered;
+
   const activeDeliveryFee = useMemo(() => {
     if (deliveryType !== 'DELIVERY') return 0;
     const targetZip = zipCode || currentUser?.zipCode || '';
-    if (!targetZip) return deliveryFee; // fallback para deliveryFee vindo do App se nenhum CEP fornecido
-    const calculated = calculateDeliveryFeeForZip(targetZip, zipRanges);
-    return calculated > 0 ? calculated : deliveryFee;
-  }, [deliveryType, zipCode, currentUser, zipRanges, deliveryFee]);
+    if (!targetZip) return (zipRanges && zipRanges.length > 0 ? 0 : deliveryFee);
+    return zipCoverage.fee;
+  }, [deliveryType, zipCode, currentUser, zipRanges, zipCoverage, deliveryFee]);
 
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const discount = appliedCoupon ? (appliedCoupon.type === 'PERCENT' ? subtotal * (appliedCoupon.discount / 100) : appliedCoupon.discount) : 0;
@@ -136,6 +148,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
     if (deliveryType === 'DELIVERY') {
       if (!zipCode || !address || !neighborhood) {
         const msg = 'Favor preencher o CEP e o endereço completo para entrega.';
+        if (onShowToast) onShowToast(msg, 'error');
+        else alert(msg);
+        return;
+      }
+
+      if (zipRanges.length > 0 && !zipCoverage.isCovered) {
+        const msg = `Infelizmente não realizamos entregas para o CEP ${zipCode} (fora da nossa área de atendimento). Por favor, altere para Retirada no Balcão para concluir seu pedido.`;
         if (onShowToast) onShowToast(msg, 'error');
         else alert(msg);
         return;
@@ -388,10 +407,33 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       />
                     </div>
                     {zipCode && (
-                      <div className="p-2.5 rounded-xl bg-red-50 border border-red-100 flex items-center justify-between text-xs font-bold">
-                        <span className="text-slate-600">Frete Calculado:</span>
-                        <span className="text-red-600 font-black">R$ {activeDeliveryFee.toFixed(2)}</span>
-                      </div>
+                      <>
+                        {isZipOutOfArea ? (
+                          <div className="p-3.5 rounded-2xl bg-red-100/90 border border-red-300 text-red-800 text-xs font-bold space-y-2">
+                            <div className="flex items-center gap-1.5 font-black uppercase text-red-900">
+                              <span className="text-base">🚫</span>
+                              <span>Fora da área de entrega</span>
+                            </div>
+                            <p className="text-red-700 leading-relaxed text-[11px]">
+                              Infelizmente não entregamos no CEP <strong>{zipCode}</strong>.
+                              Atendemos apenas faixas de CEP autorizadas da cidade.
+                            </p>
+                            <button 
+                              type="button"
+                              onClick={() => setDeliveryType('PICKUP')}
+                              className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <span>🏃</span>
+                              <span>Mudar pedido para Retirada no Balcão</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs font-bold">
+                            <span className="text-emerald-800 flex items-center gap-1">🛵 Frete Calculado:</span>
+                            <span className="text-emerald-700 font-black">R$ {activeDeliveryFee.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -475,10 +517,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
             <button 
               onClick={handleCheckoutClick}
-              disabled={isProcessing || !isStoreOpen}
-              className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest text-red-600 shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${isProcessing || !isStoreOpen ? 'bg-red-300 cursor-not-allowed' : 'bg-white hover:bg-red-50 shadow-red-900/20'}`}
+              disabled={isProcessing || !isStoreOpen || isZipOutOfArea}
+              className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                isProcessing || !isStoreOpen || isZipOutOfArea 
+                  ? 'bg-red-300 text-white cursor-not-allowed' 
+                  : 'bg-white text-red-600 hover:bg-red-50 shadow-red-900/20 cursor-pointer'
+              }`}
             >
-              {isProcessing ? 'Processando...' : (isStoreOpen ? 'Confirmar Pedido' : 'Loja Fechada')}
+              {isProcessing 
+                ? 'Processando...' 
+                : (!isStoreOpen 
+                    ? 'Loja Fechada' 
+                    : (isZipOutOfArea 
+                        ? 'CEP Fora da Área de Entrega' 
+                        : 'Confirmar Pedido'))}
             </button>
           </div>
         )}

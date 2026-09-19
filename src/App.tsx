@@ -22,7 +22,7 @@ import { InstallBanner } from './components/InstallBanner.tsx';
 import { RecessoBanner } from './components/RecessoBanner.tsx';
 import { dbService } from './services/dbService.ts';
 import { connectionError } from './firebaseConfig';
-import { calculateDeliveryFeeForZip } from './utils/zipUtils.ts';
+import { calculateDeliveryFeeForZip, checkZipCoverage } from './utils/zipUtils.ts';
 import { Product, CartItem, Order, Customer, ZipRange, PaymentSettings, CategoryItem, SubCategoryItem, Complement, DeliveryType, Coupon, Table, BotSettings } from './types.ts';
 import { safeStorage } from './utils/safeStorage.ts';
 import { DEFAULT_LOGO } from './constants.tsx';
@@ -813,6 +813,21 @@ const App: React.FC = () => {
       if (!effectiveUser.email || !effectiveUser.phone || !effectiveUser.address || !effectiveUser.neighborhood || !effectiveUser.zipCode) {
         setToast({ show: true, msg: 'Por favor, atualize seu cadastro com endereço completo, telefone e e-mail antes de fazer o pedido.', type: 'error' });
         setIsProfileModalOpen(true);
+        return;
+      }
+    }
+
+    // Validação estrita de área de entrega pelo CEP
+    if (deliveryType === 'DELIVERY' && zipRanges && zipRanges.length > 0) {
+      const targetZip = deliveryAddressInfo?.zipCode || effectiveUser?.zipCode || '';
+      const coverage = checkZipCoverage(targetZip, zipRanges);
+      if (!coverage.isCovered) {
+        setToast({ 
+          show: true, 
+          msg: `Infelizmente não realizamos entregas para o CEP ${targetZip || ''} (fora da área atendida). Por favor, selecione a opção de Retirada no Balcão.`, 
+          type: 'error' 
+        });
+        setIsOrderProcessing(false);
         return;
       }
     }

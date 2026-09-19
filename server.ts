@@ -285,14 +285,18 @@ app.get('/api/health', (req, res) => {
 app.post('/api/chat', async (req, res) => {
   try {
     const { messages, storeContext, customApiKey } = req.body;
-    const serverKey = process.env.GEMINI_API_KEY || process.env.VITE_API_KEY || process.env.GOOGLE_GENAI_API_KEY || process.env.GOOGLE_API_KEY || 'AIzaSyCGIDPicH6-rOqDexrTfNUnMqxIQGja5oA';
+    const serverKey = (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10)
+      ? process.env.GEMINI_API_KEY.trim()
+      : (process.env.VITE_API_KEY && process.env.VITE_API_KEY.trim().length > 10 ? process.env.VITE_API_KEY.trim() : '');
+
     const apiKey = (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10)
       ? customApiKey.trim()
       : serverKey;
 
     if (!apiKey) {
-      return res.status(500).json({
-        error: 'Chave de API Gemini não configurada no servidor. Configure a chave no Painel ou nas variáveis de ambiente.'
+      return res.status(401).json({
+        keyError: true,
+        error: 'Chave de API Gemini não configurada. Por favor, insira sua chave gratuita do Google Gemini no Painel Admin (aba BellaBot IA).'
       });
     }
 
@@ -440,18 +444,34 @@ REGRAS GERAIS:
 - Se o produto solicitado estiver com status [ESGOTADO NO MOMENTO], informe com gentileza e sugira uma alternativa similar do cardápio.
 `;
 
-    // Converte mensagens para o formato do Gemini
-    const contents = messages
+    // 1. Converte e limpa mensagens
+    const rawTurns = messages
       .filter((m: any) => {
         const text = String(m.content || m.text || '').trim();
         return text.length > 0;
       })
       .map((m: any) => ({
         role: (m.role === 'user' || m.isUser === true) ? 'user' : 'model',
-        parts: [{ text: String(m.content || m.text || '') }]
+        text: String(m.content || m.text || '').trim()
       }));
 
-    // Garante que a lista não esteja vazia e que o último turno seja do usuário
+    // 2. Remove turnos iniciais do modelo (ex: mensagem de boas-vindas da BellaBot)
+    // O Gemini exige que a primeira mensagem do histórico seja 'user'
+    while (rawTurns.length > 0 && rawTurns[0].role === 'model') {
+      rawTurns.shift();
+    }
+
+    // 3. Mescla turnos consecutivos do mesmo autor para respeitar estritamente user -> model -> user
+    const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+    for (const turn of rawTurns) {
+      if (contents.length > 0 && contents[contents.length - 1].role === (turn.role as 'user' | 'model')) {
+        contents[contents.length - 1].parts[0].text += `\n${turn.text}`;
+      } else {
+        contents.push({ role: turn.role as 'user' | 'model', parts: [{ text: turn.text }] });
+      }
+    }
+
+    // 4. Garante que o último turno seja do usuário
     if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
       contents.push({
         role: 'user',
@@ -486,6 +506,20 @@ REGRAS GERAIS:
     }
 
     if (!responseText && lastError) {
+      const errMsg = String(lastError?.message || lastError || '');
+      const isKeyError = errMsg.includes('leaked') || 
+                         errMsg.includes('PERMISSION_DENIED') || 
+                         errMsg.includes('API_KEY_INVALID') || 
+                         errMsg.includes('API key not valid') || 
+                         errMsg.includes('403');
+      
+      if (isKeyError) {
+        return res.status(403).json({
+          keyError: true,
+          error: 'A chave da API Gemini informada foi invalidada ou bloqueada pelo Google. Por favor, gere uma nova chave em https://aistudio.google.com/app/apikey e salve na aba BellaBot IA do Painel Admin.',
+          details: lastError.message
+        });
+      }
       throw lastError;
     }
 
@@ -497,7 +531,7 @@ REGRAS GERAIS:
   } catch (error: any) {
     console.error('Erro na rota /api/chat:', error);
     return res.status(500).json({
-      error: 'Erro ao processar mensagem com a IA',
+      error: error.message || 'Erro ao processar mensagem com a IA',
       details: error.message
     });
   }
@@ -506,19 +540,26 @@ REGRAS GERAIS:
 app.post('/api/test-gemini', async (req, res) => {
   try {
     const { customApiKey } = req.body;
-    const serverKey = process.env.GEMINI_API_KEY || process.env.VITE_API_KEY || process.env.GOOGLE_GENAI_API_KEY || process.env.GOOGLE_API_KEY || 'AIzaSyCGIDPicH6-rOqDexrTfNUnMqxIQGja5oA';
+    const serverKey = (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10)
+      ? process.env.GEMINI_API_KEY.trim()
+      : (process.env.VITE_API_KEY && process.env.VITE_API_KEY.trim().length > 10 ? process.env.VITE_API_KEY.trim() : '');
+
     const apiKey = (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10)
       ? customApiKey.trim()
       : serverKey;
 
     if (!apiKey) {
-      return res.status(400).json({ success: false, error: 'Chave de API Gemini não encontrada.' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Nenhuma chave de API Gemini encontrada. Insira sua chave no campo e clique em Testar.' 
+      });
     }
 
     const ai = new GoogleGenAI({ apiKey });
     const CANDIDATE_MODELS = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
     let reply = '';
     let usedModel = '';
+    let lastError: any = null;
 
     for (const m of CANDIDATE_MODELS) {
       try {
@@ -533,11 +574,28 @@ app.post('/api/test-gemini', async (req, res) => {
         }
       } catch (e: any) {
         console.warn(`[Test Gemini] Erro com ${m}:`, e.message);
+        lastError = e;
       }
     }
 
     if (!reply) {
-      return res.status(500).json({ success: false, error: 'Falha ao conectar com o modelo Gemini.' });
+      const errMsg = String(lastError?.message || '');
+      if (errMsg.includes('leaked')) {
+        return res.status(403).json({
+          success: false,
+          error: 'Esta chave de API foi bloqueada pelo Google ("reported as leaked"). Por favor, gere uma nova chave em https://aistudio.google.com/app/apikey.'
+        });
+      }
+      if (errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key not valid') || errMsg.includes('PERMISSION_DENIED')) {
+        return res.status(403).json({
+          success: false,
+          error: 'Chave de API inválida ou sem permissão. Verifique a chave no Google AI Studio (https://aistudio.google.com/app/apikey).'
+        });
+      }
+      return res.status(500).json({ 
+        success: false, 
+        error: `Falha ao conectar com o modelo Gemini: ${lastError?.message || 'Tente novamente.'}` 
+      });
     }
 
     return res.json({ success: true, reply, model: usedModel });

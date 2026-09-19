@@ -185,9 +185,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [subCatName, setSubCatName] = useState('');
   const [subCatParent, setSubCatParent] = useState('');
 
+  const [editingBordaId, setEditingBordaId] = useState<string | null>(null);
   const [bordaName, setBordaName] = useState('');
   const [bordaPrice, setBordaPrice] = useState<number>(0);
 
+  const [editingCompId, setEditingCompId] = useState<string | null>(null);
   const [compName, setCompName] = useState('');
   const [compPrice, setCompPrice] = useState<number>(0);
 
@@ -482,7 +484,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
         case 'PRODUCT': await onDeleteProduct(deleteTarget.id); break;
         case 'CATEGORY': await onRemoveCategory(deleteTarget.id); break;
         case 'SUBCATEGORY': await onRemoveSubCategory(deleteTarget.id); break;
-        case 'COMPLEMENT': await onRemoveComplement(deleteTarget.id); break;
+        case 'COMPLEMENT': 
+          await onRemoveComplement(deleteTarget.id); 
+          if (editingBordaId === deleteTarget.id) { setEditingBordaId(null); setBordaName(''); setBordaPrice(0); }
+          if (editingCompId === deleteTarget.id) { setEditingCompId(null); setCompName(''); setCompPrice(0); }
+          break;
         case 'COUPON': await onRemoveCoupon(deleteTarget.id); break;
         case 'ZIP': await onRemoveZipRange(deleteTarget.id); break;
         case 'PAYMENT': await onRemovePaymentMethod(deleteTarget.id); break;
@@ -577,6 +583,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
       }
       setTableName('');
     }
+  };
+
+  const handleEditBordaClick = (borda: Complement) => {
+    setEditingBordaId(borda.id);
+    setBordaName(borda.name);
+    setBordaPrice(borda.price);
+    if (formTopRef.current) formTopRef.current.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSaveBorda = () => {
+    if (!bordaName.trim()) return;
+    if (editingBordaId) {
+      onUpdateComplement(editingBordaId, bordaName.trim(), bordaPrice, [], 'BORDA');
+      setEditingBordaId(null);
+    } else {
+      onAddComplement(bordaName.trim(), bordaPrice, [], 'BORDA');
+    }
+    setBordaName('');
+    setBordaPrice(0);
+  };
+
+  const handleCancelBordaEdit = () => {
+    setEditingBordaId(null);
+    setBordaName('');
+    setBordaPrice(0);
+  };
+
+  const handleEditCompClick = (comp: Complement) => {
+    setEditingCompId(comp.id);
+    setCompName(comp.name);
+    setCompPrice(comp.price);
+    if (formTopRef.current) formTopRef.current.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSaveComp = () => {
+    if (!compName.trim()) return;
+    if (editingCompId) {
+      onUpdateComplement(editingCompId, compName.trim(), compPrice, [], 'ADICIONAL');
+      setEditingCompId(null);
+    } else {
+      onAddComplement(compName.trim(), compPrice, [], 'ADICIONAL');
+    }
+    setCompName('');
+    setCompPrice(0);
+  };
+
+  const handleCancelCompEdit = () => {
+    setEditingCompId(null);
+    setCompName('');
+    setCompPrice(0);
   };
 
   const handleConfirmPassSave = () => {
@@ -1098,12 +1154,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                      </button>
                   </div>
 
-                  {/* Formulário de Nova Borda */}
-                  <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                        <span>🥖</span>
-                        <span>Cadastrar Nova Borda</span>
-                     </h3>
+                  {/* Formulário de Nova/Edição de Borda */}
+                  <div className={`p-8 rounded-[32px] border transition-all shadow-sm space-y-6 ${
+                     editingBordaId ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400/30' : 'bg-white border-slate-200'
+                  }`}>
+                     <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                           <span>🥖</span>
+                           <span>{editingBordaId ? 'Editar Borda Recheada' : 'Cadastrar Nova Borda'}</span>
+                        </h3>
+                        {editingBordaId && (
+                           <span className="text-xs font-bold text-amber-900 bg-amber-200 px-3 py-1 rounded-full uppercase tracking-wider">
+                              Modo de Edição
+                           </span>
+                        )}
+                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div className="space-y-1">
                            <label className={labelClass}>Nome da Borda Recheada</label>
@@ -1125,17 +1190,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                               className={inputClass} 
                            />
                         </div>
-                        <button 
-                           onClick={() => { 
-                              if (!bordaName.trim()) return;
-                              onAddComplement(bordaName.trim(), bordaPrice, [], 'BORDA'); 
-                              setBordaName(''); 
-                              setBordaPrice(0); 
-                           }} 
-                           className={buttonClass}
-                        >
-                           Cadastrar Borda
-                        </button>
+                        <div className="flex gap-2">
+                           <button 
+                              type="button"
+                              onClick={handleSaveBorda} 
+                              className={`${buttonClass} flex-1`}
+                           >
+                              {editingBordaId ? 'Salvar Alterações' : 'Cadastrar Borda'}
+                           </button>
+                           {editingBordaId && (
+                              <button 
+                                 type="button"
+                                 onClick={handleCancelBordaEdit}
+                                 className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl text-xs uppercase transition-all whitespace-nowrap cursor-pointer"
+                              >
+                                 Cancelar
+                              </button>
+                           )}
+                        </div>
                      </div>
                   </div>
 
@@ -1151,36 +1223,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                      </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {complements.filter(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda')).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
-                           <div key={c.id} className="bg-white p-5 rounded-2xl border border-amber-200/80 shadow-sm flex justify-between items-center hover:border-amber-400 transition-all">
-                              <div className="min-w-0 pr-3">
-                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-sm">🥖</span>
-                                    <span className="font-bold text-slate-800 uppercase text-sm truncate block">{c.name}</span>
+                        {complements.filter(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda')).sort((a, b) => a.name.localeCompare(b.name)).map(c => {
+                           const isEditingThis = editingBordaId === c.id;
+                           return (
+                              <div 
+                                 key={c.id} 
+                                 className={`p-5 rounded-2xl border shadow-sm flex justify-between items-center transition-all ${
+                                    isEditingThis 
+                                       ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/40' 
+                                       : 'bg-white border-amber-200/80 hover:border-amber-400'
+                                 }`}
+                              >
+                                 <div className="min-w-0 pr-3">
+                                    <div className="flex items-center gap-1.5">
+                                       <span className="text-sm">🥖</span>
+                                       <span className="font-bold text-slate-800 uppercase text-sm truncate block">{c.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                       <span className="text-xs text-amber-700 font-black uppercase">+ R$ {c.price.toFixed(2)}</span>
+                                       <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Exclusiva</span>
+                                    </div>
                                  </div>
-                                 <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-xs text-amber-700 font-black uppercase">+ R$ {c.price.toFixed(2)}</span>
-                                    <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">Exclusiva</span>
+                                 <div className="flex items-center gap-1.5 shrink-0">
+                                    <button 
+                                       type="button"
+                                       onClick={() => onToggleComplement(c.id)} 
+                                       className={`text-xs font-black px-2.5 py-1.5 rounded-lg transition-all ${
+                                          c.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400'
+                                       }`}
+                                       title={c.active ? "Desativar Borda" : "Ativar Borda"}
+                                    >
+                                       {c.active ? 'Ativa' : 'Inativa'}
+                                    </button>
+                                    <button 
+                                       type="button"
+                                       onClick={() => handleEditBordaClick(c)} 
+                                       className={`text-xs font-black px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                                          isEditingThis 
+                                             ? 'bg-amber-600 text-white shadow-sm' 
+                                             : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
+                                       }`}
+                                       title="Editar Borda"
+                                    >
+                                       Editar
+                                    </button>
+                                    <button 
+                                       type="button"
+                                       onClick={() => requestDelete('COMPLEMENT', c.id, c.name)} 
+                                       className="text-red-500 text-xs font-black hover:bg-red-50 px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                                       title="Excluir Borda"
+                                    >
+                                       Excluir
+                                    </button>
                                  </div>
                               </div>
-                              <div className="flex gap-2 shrink-0">
-                                 <button 
-                                    onClick={() => onToggleComplement(c.id)} 
-                                    className={`text-xs font-black px-3 py-1.5 rounded-lg transition-all ${
-                                       c.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400'
-                                    }`}
-                                 >
-                                    {c.active ? 'Ativa' : 'Inativa'}
-                                 </button>
-                                 <button 
-                                    onClick={() => requestDelete('COMPLEMENT', c.id, c.name)} 
-                                    className="text-red-500 text-xs font-black hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all"
-                                 >
-                                    Excluir
-                                 </button>
-                              </div>
-                           </div>
-                        ))}
+                           );
+                        })}
                         {complements.filter(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda')).length === 0 && (
                            <div className="col-span-full bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-8 text-center text-slate-400 space-y-2">
                               <span className="text-3xl block">🥖</span>
@@ -1234,12 +1332,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                      </button>
                   </div>
 
-                  {/* Formulário de Novo Adicional */}
-                  <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                        <span>➕</span>
-                        <span>Cadastrar Novo Adicional</span>
-                     </h3>
+                  {/* Formulário de Novo/Edição de Adicional */}
+                  <div className={`p-8 rounded-[32px] border transition-all shadow-sm space-y-6 ${
+                     editingCompId ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-400/30' : 'bg-white border-slate-200'
+                  }`}>
+                     <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                           <span>➕</span>
+                           <span>{editingCompId ? 'Editar Adicional' : 'Cadastrar Novo Adicional'}</span>
+                        </h3>
+                        {editingCompId && (
+                           <span className="text-xs font-bold text-emerald-900 bg-emerald-200 px-3 py-1 rounded-full uppercase tracking-wider">
+                              Modo de Edição
+                           </span>
+                        )}
+                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div className="space-y-1">
                            <label className={labelClass}>Nome do Adicional</label>
@@ -1261,17 +1368,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                               className={inputClass} 
                            />
                         </div>
-                        <button 
-                           onClick={() => { 
-                              if (!compName.trim()) return;
-                              onAddComplement(compName.trim(), compPrice, [], 'ADICIONAL'); 
-                              setCompName(''); 
-                              setCompPrice(0); 
-                           }} 
-                           className={buttonClass}
-                        >
-                           Cadastrar Adicional
-                        </button>
+                        <div className="flex gap-2">
+                           <button 
+                              type="button"
+                              onClick={handleSaveComp} 
+                              className={`${buttonClass} flex-1`}
+                           >
+                              {editingCompId ? 'Salvar Alterações' : 'Cadastrar Adicional'}
+                           </button>
+                           {editingCompId && (
+                              <button 
+                                 type="button"
+                                 onClick={handleCancelCompEdit}
+                                 className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl text-xs uppercase transition-all whitespace-nowrap cursor-pointer"
+                              >
+                                 Cancelar
+                              </button>
+                           )}
+                        </div>
                      </div>
                   </div>
 
@@ -1287,36 +1401,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                      </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {complements.filter(c => c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
-                           <div key={c.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center hover:border-red-200 transition-all">
-                              <div className="min-w-0 pr-3">
-                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-sm">➕</span>
-                                    <span className="font-bold text-slate-700 uppercase text-sm truncate block">{c.name}</span>
+                        {complements.filter(c => c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')).sort((a, b) => a.name.localeCompare(b.name)).map(c => {
+                           const isEditingThis = editingCompId === c.id;
+                           return (
+                              <div 
+                                 key={c.id} 
+                                 className={`p-5 rounded-2xl border shadow-sm flex justify-between items-center transition-all ${
+                                    isEditingThis 
+                                       ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400/40' 
+                                       : 'bg-white border-slate-200 hover:border-red-200'
+                                 }`}
+                              >
+                                 <div className="min-w-0 pr-3">
+                                    <div className="flex items-center gap-1.5">
+                                       <span className="text-sm">➕</span>
+                                       <span className="font-bold text-slate-700 uppercase text-sm truncate block">{c.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                       <span className="text-xs text-red-600 font-black uppercase">+ R$ {c.price.toFixed(2)}</span>
+                                       <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">Máx 3</span>
+                                    </div>
                                  </div>
-                                 <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-xs text-red-600 font-black uppercase">+ R$ {c.price.toFixed(2)}</span>
-                                    <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">Máx 3</span>
+                                 <div className="flex items-center gap-1.5 shrink-0">
+                                    <button 
+                                       type="button"
+                                       onClick={() => onToggleComplement(c.id)} 
+                                       className={`text-xs font-black px-2.5 py-1.5 rounded-lg transition-all ${
+                                          c.active ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-100 text-slate-400'
+                                       }`}
+                                       title={c.active ? "Desativar Adicional" : "Ativar Adicional"}
+                                    >
+                                       {c.active ? 'Ativo' : 'Inativo'}
+                                    </button>
+                                    <button 
+                                       type="button"
+                                       onClick={() => handleEditCompClick(c)} 
+                                       className={`text-xs font-black px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                                          isEditingThis 
+                                             ? 'bg-emerald-600 text-white shadow-sm' 
+                                             : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                       }`}
+                                       title="Editar Adicional"
+                                    >
+                                       Editar
+                                    </button>
+                                    <button 
+                                       type="button"
+                                       onClick={() => requestDelete('COMPLEMENT', c.id, c.name)} 
+                                       className="text-red-500 text-xs font-black hover:bg-red-50 px-2 py-1.5 rounded-lg transition-all cursor-pointer"
+                                       title="Excluir Adicional"
+                                    >
+                                       Excluir
+                                    </button>
                                  </div>
                               </div>
-                              <div className="flex gap-2 shrink-0">
-                                 <button 
-                                    onClick={() => onToggleComplement(c.id)} 
-                                    className={`text-xs font-black px-3 py-1.5 rounded-lg transition-all ${
-                                       c.active ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-100 text-slate-400'
-                                    }`}
-                                 >
-                                    {c.active ? 'Ativo' : 'Inativo'}
-                                 </button>
-                                 <button 
-                                    onClick={() => requestDelete('COMPLEMENT', c.id, c.name)} 
-                                    className="text-red-500 text-xs font-black hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all"
-                                 >
-                                    Excluir
-                                 </button>
-                              </div>
-                           </div>
-                        ))}
+                           );
+                        })}
                         {complements.filter(c => c.type !== 'BORDA' && !c.name.toLowerCase().includes('borda')).length === 0 && (
                            <div className="col-span-full bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-8 text-center text-slate-400 space-y-2">
                               <span className="text-3xl block">➕</span>

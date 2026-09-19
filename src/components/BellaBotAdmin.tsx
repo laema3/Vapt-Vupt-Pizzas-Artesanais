@@ -474,17 +474,22 @@ export const BellaBotAdmin: React.FC<BellaBotAdminProps> = ({
         <div className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className={labelClass}>Chave de API do Google Gemini (Opcional)</label>
-              <span className="text-[11px] text-slate-400 font-medium">
-                {localSettings.geminiApiKey ? 'Chave personalizada informada' : 'Usando chave padrão do sistema'}
-              </span>
+              <label className={labelClass}>Chave de API do Google Gemini</label>
+              <a 
+                href="https://aistudio.google.com/app/apikey" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[11px] text-red-600 hover:text-red-700 font-bold hover:underline flex items-center gap-1"
+              >
+                <span>🔑 Obter chave gratuita no Google AI Studio ↗</span>
+              </a>
             </div>
             <div className="relative">
               <input
                 type={showApiKey ? "text" : "password"}
                 value={localSettings.geminiApiKey || ''}
                 onChange={(e) => setLocalSettings(prev => ({ ...prev, geminiApiKey: e.target.value }))}
-                placeholder="Deixe em branco para usar a chave padrão do servidor ou insira AIzaSy..."
+                placeholder="Cole aqui sua chave AIzaSy..."
                 className={inputClass + " pr-12 font-mono text-sm"}
               />
               <button
@@ -496,8 +501,8 @@ export const BellaBotAdmin: React.FC<BellaBotAdminProps> = ({
                 {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400">
-              O sistema já vem pronto para funcionar sem precisar preencher este campo. Mas se você possuir uma chave própria do Google AI Studio, pode utilizá-la aqui.
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              💡 <strong>Como funciona:</strong> O Google Gemini é gratuito. Basta clicar no link acima, fazer login com sua conta Google, clicar em <em>"Create API key"</em> e colar sua chave neste campo. Em seguida, clique em <strong>"Salvar Configurações da IA"</strong> para ativar o chat sem limites.
             </p>
           </div>
 

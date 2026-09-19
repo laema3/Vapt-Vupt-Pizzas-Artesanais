@@ -272,11 +272,22 @@ export const ChatBot: React.FC<ChatBotProps> = ({
 
     } catch (err: any) {
       console.error('[ChatBot] Erro ao conversar:', err);
+      const errMsg = String(err?.message || '');
+      const isKeyProblem = errMsg.toLowerCase().includes('chave') || 
+                           errMsg.toLowerCase().includes('gemini') || 
+                           errMsg.toLowerCase().includes('leaked') ||
+                           errMsg.toLowerCase().includes('permission_denied') ||
+                           errMsg.toLowerCase().includes('api');
+
+      const responseMessage = isKeyProblem
+        ? `${errMsg || 'A chave do Google Gemini precisa ser configurada.'}\n\n👉 Você pode gerar uma chave gratuita em aistudio.google.com/app/apikey e salvar na aba "BellaBot IA" do Painel de Controle.`
+        : 'Puxa, tive uma instabilidade momentânea na conexão 🍕. Você pode tentar novamente ou se preferir pode adicionar seu pedido diretamente pelo cardápio!';
+
       setMessages(prev => [
         ...prev,
         {
           id: Math.random().toString(36).substring(7),
-          text: 'Puxa, tive uma instabilidade momentânea na conexão 🍕. Você pode tentar novamente ou se preferir pode adicionar seu pedido diretamente pelo cardápio!',
+          text: responseMessage,
           isUser: false,
           timestamp: new Date()
         }

@@ -23,6 +23,7 @@ import { RecessoBanner } from './components/RecessoBanner.tsx';
 import { dbService } from './services/dbService.ts';
 import { connectionError } from './firebaseConfig';
 import { calculateDeliveryFeeForZip, checkZipCoverage } from './utils/zipUtils.ts';
+import { isStoreCurrentlyOpen } from './utils/storeHoursUtils.ts';
 import { Product, CartItem, Order, Customer, ZipRange, PaymentSettings, CategoryItem, SubCategoryItem, Complement, DeliveryType, Coupon, Table, BotSettings } from './types.ts';
 import { safeStorage } from './utils/safeStorage.ts';
 import { DEFAULT_LOGO } from './constants.tsx';
@@ -415,11 +416,16 @@ const App: React.FC = () => {
           const settings = data.find(d => d.id === 'general');
           if (settings) {
             console.log("[App] Settings recebidas do subscribe:", settings);
-            if (settings.isStoreOpen !== undefined) setIsStoreOpen(settings.isStoreOpen);
             if (settings.isMaintenanceMode !== undefined) setIsMaintenanceMode(settings.isMaintenanceMode);
             if (settings.logoUrl) setLogoUrl(settings.logoUrl);
             if (settings.storeName) setStoreName(settings.storeName);
-            if (settings.storeHours) setStoreHours(settings.storeHours);
+            if (settings.storeHours) {
+              setStoreHours(settings.storeHours);
+              const openNow = isStoreCurrentlyOpen(settings.storeHours);
+              setIsStoreOpen(openNow);
+            } else if (settings.isStoreOpen !== undefined) {
+              setIsStoreOpen(settings.isStoreOpen);
+            }
             if (settings.themeColor) { setThemeColor(settings.themeColor); safeStorage.setItem('nl_theme_color', settings.themeColor); }
             setSocialLinks({ 
               instagram: settings.instagram || '', whatsapp: settings.whatsapp || '', facebook: settings.facebook || '',
@@ -602,37 +608,18 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [orders, currentUser]);
 
-  // Horário de abertura e fechamento automático
+  // Horário de abertura e fechamento automático controlado pelo menu Horários
   useEffect(() => {
     const checkStoreSchedule = () => {
-      const now = new Date();
-      const day = now.getDay();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const currentTimeMinutes = hours * 60 + minutes;
-
-      const daySchedule = storeHours[day];
-      if (daySchedule && daySchedule.enabled) {
-        const [closeH, closeM] = (daySchedule.close || '23:30').split(':').map(Number);
-        const closeTimeMinutes = closeH * 60 + closeM;
-
-        if (currentTimeMinutes === closeTimeMinutes) {
-          if (isStoreOpen) {
-            console.log("[Auto-Schedule] Fechando loja automaticamente conforme horário programado:", daySchedule.close);
-            setIsStoreOpen(false);
-            dbService.save('settings', 'general', { isStoreOpen: false });
-          }
-        }
-      } else if (daySchedule && !daySchedule.enabled) {
-        if (isStoreOpen) {
-          console.log("[Auto-Schedule] Fechando loja: dia desativado no controle de horários");
-          setIsStoreOpen(false);
-          dbService.save('settings', 'general', { isStoreOpen: false });
-        }
+      const shouldBeOpen = isStoreCurrentlyOpen(storeHours);
+      if (shouldBeOpen !== isStoreOpen) {
+        console.log(`[Auto-Schedule] Atualizando status da loja pelo cronograma de horários: ${shouldBeOpen ? 'ABERTA' : 'FECHADA'}`);
+        setIsStoreOpen(shouldBeOpen);
+        dbService.save('settings', 'general', { isStoreOpen: shouldBeOpen });
       }
     };
 
-    const scheduleInterval = setInterval(checkStoreSchedule, 60000); // Verifica a cada minuto
+    const scheduleInterval = setInterval(checkStoreSchedule, 30000); // Verifica a cada 30 segundos
     checkStoreSchedule(); // Verifica imediatamente ao carregar
     
     return () => clearInterval(scheduleInterval);
@@ -1325,7 +1312,9 @@ const App: React.FC = () => {
             storeHours={storeHours}
             onUpdateStoreHours={(hours) => {
               setStoreHours(hours);
-              dbService.save('settings', 'general', { storeHours: hours });
+              const openNow = isStoreCurrentlyOpen(hours);
+              setIsStoreOpen(openNow);
+              dbService.save('settings', 'general', { storeHours: hours, isStoreOpen: openNow });
             }}
             botSettings={botSettings}
             onUpdateBotSettings={(newBotSettings) => {

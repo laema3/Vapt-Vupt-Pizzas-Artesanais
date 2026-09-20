@@ -731,8 +731,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           </div>
           <h2 className="text-2xl font-black text-white uppercase tracking-tighter">DELIVERY <span className="text-red-500">ADMIN</span></h2>
           <div className="flex items-center gap-2 mt-2">
-            <div className={`w-3 h-3 rounded-full ${isStoreOpen ? 'bg-red-500 animate-pulse' : 'bg-red-500'}`}></div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{isStoreOpen ? 'Loja Aberta' : 'Loja Fechada'}</span>
+            <div className={`w-3 h-3 rounded-full ${isStoreOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{isStoreOpen ? 'Loja Aberta' : 'Loja Fechada'}</span>
           </div>
         </div>
 
@@ -776,14 +776,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                 </span>
                 {activeView === 'sugestoes' ? 'Pizza da Semana (WhatsApp & Instagram)' : activeView === 'bellabot' ? 'BellaBot IA (Atendimento & Vendas)' : activeView}
               </h1>
-              <button onClick={onToggleMaintenance} className={`hidden md:flex items-center gap-3 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${isMaintenanceMode ? 'bg-amber-600/10 border-amber-500 text-amber-500 hover:bg-amber-600/20' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800/80'}`}>
-                <div className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`}></div>
-                {isMaintenanceMode ? '🚧 MANUTENÇÃO ATIVA' : '🌐 SITE ONLINE'}
-              </button>
-              <button onClick={onToggleStore} className={`hidden md:flex items-center gap-3 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${isStoreOpen ? 'bg-emerald-600/10 border-emerald-500 text-emerald-500 hover:bg-emerald-600/20' : 'bg-red-600/10 border-red-500 text-red-500 hover:bg-red-600/20'}`}>
-                <div className={`w-2 h-2 rounded-full ${isStoreOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                {isStoreOpen ? 'LOJA ABERTA' : 'LOJA FECHADA'}
-              </button>
            </div>
            <div className="flex items-center gap-4">
              <button onClick={onWaiterMode || onBackToSite} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2">
@@ -1967,29 +1959,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                        Configurações Gerais
                      </h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                        <div className="space-y-3">
-                           <label className={labelClass}>Status da Loja</label>
-                           <button onClick={onToggleStore} className={`w-full py-8 rounded-2xl flex items-center justify-center gap-4 border-2 transition-all ${isStoreOpen ? 'bg-emerald-50 border-emerald-500 text-emerald-600 font-black ring-4 ring-emerald-100' : 'bg-red-50 border-red-200 text-red-500 hover:bg-slate-100 hover:border-red-300'}`}>
-                              <div className={`w-3 h-3 rounded-full ${isStoreOpen ? 'bg-emerald-500 animate-pulse shadow-lg' : 'bg-red-500'}`}></div>
-                              <span className="font-black text-lg uppercase tracking-widest">{isStoreOpen ? 'Loja Aberta' : 'Loja Fechada'}</span>
-                           </button>
-                        </div>
-                        <div className="space-y-3">
-                           <label className={labelClass}>Modo Manutenção</label>
-                           <button 
-                             onClick={onToggleMaintenance} 
-                             className={`w-full py-8 rounded-2xl flex flex-col items-center justify-center gap-2 border-2 transition-all ${isMaintenanceMode ? 'bg-amber-50 border-amber-500 text-amber-600 font-black ring-4 ring-amber-100 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400 font-bold hover:bg-slate-100 hover:border-slate-300'}`}
-                           >
-                              <div className="flex items-center gap-3">
-                                 <span className="text-2xl">{isMaintenanceMode ? '🚧' : '🌐'}</span>
-                                 <span className="font-black text-lg uppercase tracking-widest">{isMaintenanceMode ? 'Em Manutenção' : 'Site Online'}</span>
+                        <div className="space-y-3 md:col-span-2">
+                           <label className={labelClass}>Funcionamento da Loja</label>
+                           <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                              <div className="space-y-1">
+                                 <span className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-2">
+                                    <span>⏰</span> Controle Automático de Horários
+                                 </span>
+                                 <p className="text-xs text-slate-500 font-medium">
+                                    A abertura e fechamento da loja são controlados automaticamente pela aba <strong>Horários</strong>.
+                                 </p>
                               </div>
-                           </button>
-                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center leading-relaxed">
-                              {isMaintenanceMode 
-                               ? '⚠️ Clientes comuns verão aviso de manutenção, mas você como admin acessa normalmente.' 
-                               : '✅ O site está visível ao público e recebendo pedidos normalmente.'}
-                           </p>
+                              <button 
+                                 onClick={() => setActiveView('horarios')}
+                                 className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 cursor-pointer shadow-sm"
+                              >
+                                 Ir para Horários
+                              </button>
+                           </div>
                         </div>
                         <div className="space-y-3">
                            <label className={labelClass + " text-slate-400"}>Modo Quiosque (Totem) - Desativado</label>

@@ -828,7 +828,9 @@ const App: React.FC = () => {
           neighborhood: deliveryAddressInfo?.neighborhood || effectiveUser?.neighborhood,
           cartTotal: cart.reduce((acc, i) => acc + (i.price * i.quantity), 0),
           itemsCount: cart.reduce((acc, i) => acc + i.quantity, 0),
-          topic: ntfyTopic
+          topic: ntfyTopic,
+          reason: 'Tentativa de pedido fora da área atendida',
+          force: true
         });
         setToast({ 
           show: true, 

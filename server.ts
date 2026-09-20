@@ -689,7 +689,8 @@ app.post('/api/notify/ntfy-out-of-area', async (req, res) => {
       city,
       address,
       cartTotal,
-      itemsCount
+      itemsCount,
+      reason
     } = req.body;
 
     if (!zipCode) {
@@ -701,9 +702,10 @@ app.post('/api/notify/ntfy-out-of-area', async (req, res) => {
 
     const messageLines: string[] = [
       `⚠️ TENTATIVA DE PEDIDO - CEP NÃO ATENDIDO`,
+      reason ? `Motivo: ${reason}` : '',
       ``,
       `📍 CEP: ${formattedZip}`
-    ];
+    ].filter(Boolean);
     if (neighborhood) messageLines.push(`🏘️ Bairro: ${neighborhood}`);
     if (city) messageLines.push(`🏙️ Cidade: ${city}`);
     if (address) messageLines.push(`🏠 Endereço: ${address}`);
@@ -723,7 +725,7 @@ app.post('/api/notify/ntfy-out-of-area', async (req, res) => {
       method: 'POST',
       body: messageLines.join('\n'),
       headers: {
-        'Title': `📍 CEP Fora de Área: ${formattedZip}`,
+        'Title': `Alerta CEP: ${formattedZip}`,
         'Priority': 'high',
         'Tags': 'warning,round_pushpin,pizza',
       }
@@ -754,7 +756,7 @@ app.post('/api/notify/ntfy-test', async (req, res) => {
       method: 'POST',
       body: testMsg,
       headers: {
-        'Title': '✅ Teste ntfy - Bella Borda Delivery',
+        'Title': 'Teste ntfy - Bella Borda Delivery',
         'Priority': 'default',
         'Tags': 'white_check_mark,pizza,bell',
       }

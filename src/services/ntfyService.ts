@@ -11,6 +11,8 @@ export interface OutOfAreaNotificationData {
   cartTotal?: number;
   itemsCount?: number;
   topic?: string;
+  reason?: string;
+  force?: boolean;
 }
 
 export const DEFAULT_NTFY_TOPIC = 'bellaborda-ceps';
@@ -18,7 +20,6 @@ const RECENT_NOTIFICATIONS_KEY = 'nl_recent_out_of_area_ceps';
 
 /**
  * Envia notificação para o tópico ntfy do lojista quando um cliente tenta fazer pedido com CEP fora de área.
- * Possui proteção de debounce anti-spam (não repete o mesmo CEP no intervalo de 2 minutos no mesmo navegador).
  */
 export async function sendOutOfAreaNotification(data: OutOfAreaNotificationData): Promise<{ success: boolean; error?: string; cached?: boolean }> {
   if (!data.zipCode) return { success: false, error: 'CEP ausente' };
@@ -26,22 +27,24 @@ export async function sendOutOfAreaNotification(data: OutOfAreaNotificationData)
   const cleanZip = data.zipCode.replace(/\D/g, '');
   if (!cleanZip) return { success: false, error: 'CEP inválido' };
 
-  // Verificação de debounce (anti-spam de 2 minutos por CEP na mesma sessão)
-  const now = Date.now();
-  try {
-    const rawCache = typeof window !== 'undefined' ? window.sessionStorage.getItem(RECENT_NOTIFICATIONS_KEY) : null;
-    const cache: Record<string, number> = rawCache ? JSON.parse(rawCache) : {};
-    const lastSent = cache[cleanZip];
-    if (lastSent && (now - lastSent < 2 * 60 * 1000)) {
-      console.log(`[ntfyService] Notificação para CEP ${cleanZip} já enviada recentemente (debounce ativo).`);
-      return { success: true, cached: true };
+  // Verificação leve de debounce (5 segundos para evitar duplicações acidentais de clique)
+  if (!data.force) {
+    const now = Date.now();
+    try {
+      const rawCache = typeof window !== 'undefined' ? window.sessionStorage.getItem(RECENT_NOTIFICATIONS_KEY) : null;
+      const cache: Record<string, number> = rawCache ? JSON.parse(rawCache) : {};
+      const lastSent = cache[cleanZip];
+      if (lastSent && (now - lastSent < 5 * 1000)) {
+        console.log(`[ntfyService] Notificação para CEP ${cleanZip} enviada há menos de 5s.`);
+        return { success: true, cached: true };
+      }
+      cache[cleanZip] = now;
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(RECENT_NOTIFICATIONS_KEY, JSON.stringify(cache));
+      }
+    } catch (e) {
+      // Ignora erros de quota de storage
     }
-    cache[cleanZip] = now;
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem(RECENT_NOTIFICATIONS_KEY, JSON.stringify(cache));
-    }
-  } catch (e) {
-    // Ignora erros de quota de storage
   }
 
   const topic = (data.topic || DEFAULT_NTFY_TOPIC).trim().replace(/[^a-zA-Z0-9_-]/g, '') || DEFAULT_NTFY_TOPIC;
@@ -56,7 +59,8 @@ export async function sendOutOfAreaNotification(data: OutOfAreaNotificationData)
       body: JSON.stringify({
         ...data,
         topic,
-        zipCode: formattedZip
+        zipCode: formattedZip,
+        reason: data.reason || 'CEP fora da área de entrega ou não localizado'
       })
     });
     if (res.ok) {
@@ -72,9 +76,10 @@ export async function sendOutOfAreaNotification(data: OutOfAreaNotificationData)
     try {
       const bodyLines = [
         `⚠️ TENTATIVA DE PEDIDO - CEP NÃO ATENDIDO`,
+        data.reason ? `Motivo: ${data.reason}` : '',
         ``,
         `📍 CEP: ${formattedZip}`,
-      ];
+      ].filter(Boolean);
       if (data.neighborhood) bodyLines.push(`🏘️ Bairro: ${data.neighborhood}`);
       if (data.city) bodyLines.push(`🏙️ Cidade: ${data.city}`);
       if (data.address) bodyLines.push(`🏠 Endereço: ${data.address}`);
@@ -89,7 +94,7 @@ export async function sendOutOfAreaNotification(data: OutOfAreaNotificationData)
         method: 'POST',
         body: bodyLines.join('\n'),
         headers: {
-          'Title': `📍 CEP Fora de Área: ${formattedZip}`,
+          'Title': `Alerta CEP: ${formattedZip}`,
           'Priority': 'high',
           'Tags': 'warning,round_pushpin,pizza',
         }
@@ -108,7 +113,7 @@ export async function sendOutOfAreaNotification(data: OutOfAreaNotificationData)
     await dbService.save('uncovered_ceps', logId, {
       zipCode: formattedZip,
       cleanZip,
-      neighborhood: data.neighborhood || '',
+      neighborhood: data.neighborhood || (data.reason || ''),
       city: data.city || '',
       address: data.address || '',
       customerName: data.customerName || 'Cliente',
@@ -150,7 +155,7 @@ export async function sendTestNtfyNotification(topic: string = DEFAULT_NTFY_TOPI
       method: 'POST',
       body: testMsg,
       headers: {
-        'Title': '✅ Teste ntfy - Bella Borda Delivery',
+        'Title': 'Teste ntfy - Bella Borda Delivery',
         'Priority': 'default',
         'Tags': 'white_check_mark,pizza,bell',
       }

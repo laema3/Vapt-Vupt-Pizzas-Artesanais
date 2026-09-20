@@ -103,28 +103,51 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           foundNeighborhood = res.neighborhood;
         }
         if (res.city) foundCity = res.city;
-        if (onShowToast) onShowToast('Endereço localizado pelo CEP!', 'success');
-      } else if (res && res.error) {
-        if (onShowToast) onShowToast('CEP não localizado no sistema de Correios.', 'error');
-      }
 
-      // Se o CEP estiver fora da cobertura de entrega da pizzaria, notifica o lojista via ntfy
-      if (zipRanges && zipRanges.length > 0) {
-        const coverage = checkZipCoverage(clean, zipRanges);
-        if (!coverage.isCovered) {
-          sendOutOfAreaNotification({
-            zipCode: val,
-            customerName: currentUser?.name,
-            customerPhone: currentUser?.phone,
-            customerEmail: currentUser?.email,
-            address: foundAddress,
-            neighborhood: foundNeighborhood,
-            city: foundCity,
-            cartTotal: total,
-            itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
-            topic: ntfyTopic
-          });
+        // Se o CEP estiver fora da cobertura de entrega da pizzaria, notifica imediatamente
+        if (zipRanges && zipRanges.length > 0) {
+          const coverage = checkZipCoverage(clean, zipRanges);
+          if (!coverage.isCovered) {
+            if (onShowToast) {
+              onShowToast(`Atenção: CEP ${val} fora da nossa área de entrega (pedidos somente para Retirada no Balcão).`, 'error');
+            }
+            sendOutOfAreaNotification({
+              zipCode: val,
+              customerName: currentUser?.name,
+              customerPhone: currentUser?.phone,
+              customerEmail: currentUser?.email,
+              address: foundAddress,
+              neighborhood: foundNeighborhood,
+              city: foundCity,
+              cartTotal: total,
+              itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+              topic: ntfyTopic,
+              reason: 'CEP fora da área de entrega cadastrada',
+              force: true
+            });
+          } else {
+            if (onShowToast) onShowToast('Endereço localizado pelo CEP!', 'success');
+          }
+        } else {
+          if (onShowToast) onShowToast('Endereço localizado pelo CEP!', 'success');
         }
+      } else {
+        // CEP não localizado no sistema de Correios - dispara imediatamente para o ntfy no exato momento da mensagem
+        if (onShowToast) onShowToast('CEP não localizado no sistema de Correios.', 'error');
+        sendOutOfAreaNotification({
+          zipCode: val,
+          customerName: currentUser?.name,
+          customerPhone: currentUser?.phone,
+          customerEmail: currentUser?.email,
+          address: foundAddress,
+          neighborhood: foundNeighborhood || 'Não localizado nos Correios',
+          city: foundCity,
+          cartTotal: total,
+          itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+          topic: ntfyTopic,
+          reason: 'CEP não localizado no sistema de Correios',
+          force: true
+        });
       }
     }
   };
@@ -194,7 +217,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           neighborhood,
           cartTotal: total,
           itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
-          topic: ntfyTopic
+          topic: ntfyTopic,
+          reason: 'Tentativa de concluir pedido com CEP fora da área',
+          force: true
         });
 
         const msg = `Infelizmente não realizamos entregas para o CEP ${zipCode} (fora da nossa área de atendimento). Por favor, altere para Retirada no Balcão para concluir seu pedido.`;

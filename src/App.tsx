@@ -13,6 +13,7 @@ import { WaiterLoginModal } from './components/WaiterLoginModal.tsx';
 import { OrderSuccessModal } from './components/OrderSuccessModal.tsx';
 import { ChatBot } from './components/ChatBot.tsx';
 import { WaiterDashboard } from './components/WaiterDashboard.tsx';
+import { OpeningCepModal } from './components/OpeningCepModal.tsx';
 
 import { Footer } from './components/Footer.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
@@ -224,6 +225,36 @@ const App: React.FC = () => {
   const [tableId, setTableId] = useState<string | undefined>(undefined);
   const [ntfyTopic, setNtfyTopic] = useState<string>('bellaborda-ceps');
   const [uncoveredCeps, setUncoveredCeps] = useState<UncoveredZipLog[]>([]);
+
+  const [isOpeningCepModalOpen, setIsOpeningCepModalOpen] = useState<boolean>(() => {
+    if (window.location.pathname.startsWith('/mesa/')) return false;
+    return safeStorage.getItem('nl_opening_cep_verified') !== 'true';
+  });
+
+  const handleOpeningCepVerified = (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number) => {
+    safeStorage.setItem('nl_opening_cep_verified', 'true');
+    safeStorage.setItem('nl_opening_cep', cep);
+    setIsOpeningCepModalOpen(false);
+
+    if (currentUser) {
+      const updated = {
+        ...currentUser,
+        zipCode: cep,
+        address: currentUser.address || addressInfo.address || '',
+        neighborhood: currentUser.neighborhood || addressInfo.neighborhood || ''
+      };
+      setCurrentUser(updated);
+      safeStorage.setItem('nl_current_user', JSON.stringify(updated));
+    }
+    setToast({ show: true, msg: `CEP ${cep} verificado com sucesso! Bom apetite!`, type: 'success' });
+  };
+
+  const handleOpeningCepChoosePickup = () => {
+    safeStorage.setItem('nl_opening_cep_verified', 'true');
+    setForcedDeliveryType('PICKUP');
+    setIsOpeningCepModalOpen(false);
+    setToast({ show: true, msg: 'Modo Retirada no Balcão selecionado!', type: 'success' });
+  };
 
   const previousOrdersRef = useRef<Order[]>([]);
 
@@ -1288,6 +1319,7 @@ const App: React.FC = () => {
           }
         }} 
         searchTerm={searchTerm} onSearchChange={setSearchTerm} currentUser={currentUser} onAuthClick={() => setIsAuthModalOpen(true)} onLogout={() => { setCurrentUser(null); safeStorage.removeItem('nl_current_user'); }} onMyOrdersClick={() => setActiveView('my-orders')} onProfileClick={() => setIsProfileModalOpen(true)} isStoreOpen={isStoreOpen} logoUrl={logoUrl} storeName={storeName}
+        onConsultCepClick={() => setIsOpeningCepModalOpen(true)}
       />
 
       <main className="flex-1 w-full relative">
@@ -1595,6 +1627,17 @@ const App: React.FC = () => {
         onAdd={handleAddToCart} 
         isStoreOpen={isStoreOpen} 
         logoUrl={logoUrl} 
+      />
+      <OpeningCepModal
+        isOpen={isOpeningCepModalOpen}
+        zipRanges={zipRanges}
+        storeName={storeName}
+        logoUrl={logoUrl}
+        onVerifySuccess={handleOpeningCepVerified}
+        onChoosePickup={handleOpeningCepChoosePickup}
+        onLogUncoveredCep={(cep) => {
+          sendOutOfAreaNotification(ntfyTopic, cep).catch(() => {});
+        }}
       />
       <AuthModal 
         isOpen={isAuthModalOpen} 

@@ -33,6 +33,68 @@ const NO_BORDA_COMPLEMENT: Complement = {
   type: 'BORDA',
 };
 
+// Identifica de forma rigorosa se um produto é uma pizza
+const checkIfProductIsPizza = (product: Product | null | undefined, categories: CategoryItem[] = []): boolean => {
+  if (!product) return false;
+  const name = (product.name || '').toLowerCase().trim();
+  const cat = (product.category || '').toLowerCase().trim();
+  const sub = (product.subCategory || '').toLowerCase().trim();
+  const desc = (product.description || '').toLowerCase().trim();
+
+  // Localiza o objeto de categoria para conferir pelo ID ou Nome
+  const catObj = categories.find(c => 
+    c.id === product.category || 
+    c.name.toLowerCase().trim() === cat
+  );
+  const categoryName = (catObj?.name || product.category || '').toLowerCase().trim();
+
+  // Lista abrangente de palavras-chave que indicam explicitamente que NÃO é pizza
+  const nonPizzaKeywords = [
+    'bebida', 'refrigerante', 'refri', 'suco', 'cerveja', 'água', 'agua', 
+    'drink', 'drinks', 'chopp', 'chope', 'vinho', 'dose', 'energético', 'energetico', 
+    'sobremesa', 'sorvete', 'açai', 'acai', 'mousse', 'pudim', 'torta', 'brownie',
+    'porção', 'porções', 'porcao', 'porcoes', 'batata', 'frita', 'fritas', 
+    'entrada', 'entradas', 'acompanhamento', 'acompanhamentos', 'petisco', 'petiscos',
+    'hamburguer', 'hambúrguer', 'burger', 'lanche', 'sanduiche', 'sanduíche', 
+    'pastel', 'caldo', 'salgado', 'salgados', 'coca', 'guaraná', 'guarana', 
+    'fanta', 'sprite', 'pepsi', 'heineken', 'stella', 'brahma', 'skol', 'budweiser',
+    'corona', 'amstel', 'eisenbahn', 'del valle', 'red bull', 'monster', 'lata', 'litro', 'long neck'
+  ];
+
+  if (nonPizzaKeywords.some(term => 
+    categoryName.includes(term) || 
+    cat.includes(term) || 
+    sub.includes(term) || 
+    name.includes(term)
+  )) {
+    return false;
+  }
+
+  // Se contiver a palavra "pizza" explicitamente no nome, categoria, subcategoria ou descrição
+  if (
+    name.includes('pizza') || 
+    categoryName.includes('pizza') || 
+    sub.includes('pizza') || 
+    desc.includes('pizza')
+  ) {
+    return true;
+  }
+
+  // Categorias ou subcategorias clássicas de pizzarias (mesmo quando o lojista não escreve a palavra 'pizza')
+  const pizzaCategoryKeywords = [
+    'salgada', 'doce', 'tradicionais', 'tradicional', 'especiais', 'especial', 
+    'premium', 'gourmet', 'calzone', 'calzones', 'brotinho', 'broto', 
+    'gigante', 'grande', 'média', 'media', 'pequena'
+  ];
+
+  if (pizzaCategoryKeywords.some(kw => categoryName.includes(kw) || sub.includes(kw))) {
+    return true;
+  }
+
+  // Por padrão: se não tem indicação de ser pizza, NÃO é pizza!
+  return false;
+};
+
 export const ProductModal: React.FC<ProductModalProps> = ({ 
   product, 
   allProducts = [], 
@@ -82,45 +144,33 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   }, [product]);
 
   // Identifica se o produto atual é uma pizza
-  const isPizza = useMemo(() => {
-    if (!product) return false;
-    const name = (product.name || '').toLowerCase();
-    const cat = (product.category || '').toLowerCase();
-    const sub = (product.subCategory || '').toLowerCase();
-    const desc = (product.description || '').toLowerCase();
+  const isPizza = useMemo(() => checkIfProductIsPizza(product, categories), [product, categories]);
 
-    const nonPizza = ['bebida', 'refrigerante', 'suco', 'cerveja', 'água', 'agua', 'sobremesa', 'porção', 'porcao', 'batata', 'fritas'];
-    if (nonPizza.some(term => cat.includes(term) || name.includes(term))) {
-      return false;
-    }
-
-    if (name.includes('pizza') || cat.includes('pizza') || sub.includes('pizza') || desc.includes('pizza')) {
-      return true;
-    }
-
-    const catObj = categories.find(c => c.id === product.category || c.name.toLowerCase() === cat);
-    if (catObj && catObj.name.toLowerCase().includes('pizza')) {
-      return true;
-    }
-
-    // Se houver qualquer outro produto com 'pizza' no catálogo, ou se for uma pizzaria
-    return true;
-  }, [product, categories]);
-
-  // Separar Bordas e Adicionais aplicáveis
+  // Separar Bordas e Adicionais aplicáveis (BORDAS APENAS PARA PIZZAS)
   const applicableComplements = useMemo(() => {
     if (!product || !complements) return [];
-    return complements.filter(c => 
-      c.active && (!c.applicable_categories || c.applicable_categories.length === 0 || c.applicable_categories.includes(product.category))
-    );
-  }, [product, complements]);
+    return complements.filter(c => {
+      if (!c.active) return false;
+      const isBordaComp = c.type === 'BORDA' || c.name.toLowerCase().includes('borda');
+      // Bordas NUNCA são aplicáveis se o produto não for pizza!
+      if (isBordaComp && !isPizza) return false;
+
+      if (!c.applicable_categories || c.applicable_categories.length === 0) {
+        return true;
+      }
+      return c.applicable_categories.includes(product.category) || 
+             c.applicable_categories.includes(product.id);
+    });
+  }, [product, complements, isPizza]);
 
   const bordaItems = useMemo(() => {
+    // Bordas são estritamente exclusivas para pizzas
+    if (!isPizza) return [];
     const list = applicableComplements.filter(c => 
       c.type === 'BORDA' || c.name.toLowerCase().includes('borda')
     );
     return list;
-  }, [applicableComplements]);
+  }, [applicableComplements, isPizza]);
 
   const adicionalItems = useMemo(() => {
     const list = applicableComplements.filter(c => 
@@ -131,34 +181,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   // Lista de outros sabores de pizza disponíveis para a segunda metade
   const availableSecondFlavors = useMemo(() => {
-    if (!product || !allProducts || allProducts.length === 0) return [];
+    if (!isPizza || !product || !allProducts || allProducts.length === 0) return [];
     return allProducts.filter(p => {
       if (p.id === product.id) return false;
       if (p.hidden || p.outOfStock) return false;
-
-      const name = (p.name || '').toLowerCase();
-      const cat = (p.category || '').toLowerCase();
-      const nonPizza = ['bebida', 'refrigerante', 'suco', 'cerveja', 'água', 'agua', 'sobremesa', 'porção', 'porcao', 'batata', 'fritas'];
-      if (nonPizza.some(term => cat.includes(term) || name.includes(term))) {
-        return false;
-      }
+      if (!checkIfProductIsPizza(p, categories)) return false;
 
       if (flavorSearch.trim()) {
         const query = flavorSearch.toLowerCase().trim();
-        const matchesName = name.includes(query);
+        const matchesName = (p.name || '').toLowerCase().includes(query);
         const matchesDesc = (p.description || '').toLowerCase().includes(query);
         return matchesName || matchesDesc;
       }
       return true;
     });
-  }, [product, allProducts, flavorSearch]);
+  }, [isPizza, product, allProducts, categories, flavorSearch]);
 
   // Objeto de borda efetivo (se 'NONE', vira objeto sem_borda com price: 0)
   const effectiveBorda: Complement | null = useMemo(() => {
+    if (!isPizza) return null;
     if (bordaSelection === 'NONE') return NO_BORDA_COMPLEMENT;
     if (bordaSelection && typeof bordaSelection === 'object') return bordaSelection;
     return null;
-  }, [bordaSelection]);
+  }, [isPizza, bordaSelection]);
 
   // Lista combinada de complementos para salvar no pedido
   const selectedComplements = useMemo(() => {
@@ -168,7 +213,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     ];
   }, [effectiveBorda, selectedAdicionais]);
 
-  // Regra de obrigatoriedade da borda
+  // Regra de obrigatoriedade da borda (EXCLUSIVA para pizzas com bordas cadastradas)
   const isBordaMandatory = Boolean(isPizza && bordaItems.length > 0);
   const hasBordaDecision = !isBordaMandatory || bordaSelection !== null;
 
@@ -239,7 +284,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const canAddToCart = () => {
     if (!isStoreOpen || product.outOfStock) return false;
     if (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) return false;
-    if (!hasBordaDecision) return false;
+    if (isPizza && !hasBordaDecision) return false;
     return true;
   };
 
@@ -248,7 +293,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       scrollToSection(secondFlavorSectionRef);
       return;
     }
-    if (!hasBordaDecision) {
+    if (isPizza && !hasBordaDecision) {
       setBordaHighlightAlert(true);
       scrollToSection(bordaSectionRef);
       return;
@@ -265,7 +310,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         calculatedBasePrice
       } : undefined,
       {
-        selectedBorda: effectiveBorda || undefined,
+        selectedBorda: isPizza ? (effectiveBorda || undefined) : undefined,
         selectedAdditionals: selectedAdicionais.length > 0 ? selectedAdicionais : undefined,
       }
     );
@@ -561,8 +606,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </div>
           )}
 
-          {/* Bordas Recheadas (Escolha Obrigatória: 1 Borda Recheada OU SEM BORDA) */}
-          {bordaItems.length > 0 && (
+          {/* Bordas Recheadas (Exclusivo para Pizzas: 1 Borda Recheada OU SEM BORDA) */}
+          {isPizza && bordaItems.length > 0 && (
             <div 
               ref={bordaSectionRef} 
               className={`space-y-3 pt-4 border-t border-slate-100 transition-all rounded-2xl ${
@@ -843,7 +888,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             disabled={!canAddToCart()}
             className={`w-full sm:flex-1 py-4 px-6 rounded-2xl font-black uppercase text-sm tracking-widest text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer ${
               !canAddToCart()
-                ? (!hasBordaDecision)
+                ? (isPizza && !hasBordaDecision)
                   ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20 animate-pulse'
                   : 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
                 : 'bg-red-600 hover:bg-red-700 shadow-red-900/20'
@@ -856,7 +901,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 ? 'Loja Fechada'
                 : (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor)
                 ? 'Escolha o 2º Sabor para Continuar'
-                : (isBordaMandatory && bordaSelection === null)
+                : (isPizza && isBordaMandatory && bordaSelection === null)
                 ? '⚠️ Escolha a Borda (ou Sem Borda)'
                 : (isPizza && pizzaMode === 'MEIO_A_MEIO')
                 ? `Adicionar Meio a Meio • R$ ${totalPrice.toFixed(2)}`

@@ -737,7 +737,7 @@ const App: React.FC = () => {
       ? `${product.id}_half_${pizzaOptions.secondFlavor.id}_${Date.now()}`
       : `${product.id}_${Date.now()}`;
 
-    const bordaComp = extraOptions?.selectedBorda || comps?.find(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda'));
+    const bordaComp = pizzaOptions ? (extraOptions?.selectedBorda || comps?.find(c => c.type === 'BORDA' || c.name.toLowerCase().includes('borda'))) : undefined;
     const additionalsList = extraOptions?.selectedAdditionals || comps?.filter(c => c !== bordaComp);
 
     const newCartItem: CartItem = {

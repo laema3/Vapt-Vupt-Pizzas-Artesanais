@@ -710,7 +710,7 @@ app.post('/api/notify/ntfy-out-of-area', async (req, res) => {
     if (city) messageLines.push(`🏙️ Cidade: ${city}`);
     if (address) messageLines.push(`🏠 Endereço: ${address}`);
     if (customerName) messageLines.push(`👤 Cliente: ${customerName}`);
-    if (customerPhone) messageLines.push(`📞 Telefone: ${customerPhone}`);
+    if (customerPhone) messageLines.push(`📱 WhatsApp: ${customerPhone}`);
     if (customerEmail) messageLines.push(`✉️ E-mail: ${customerEmail}`);
     if (cartTotal) messageLines.push(`💰 Total do Pedido: R$ ${Number(cartTotal).toFixed(2)}`);
     if (itemsCount) messageLines.push(`🍕 Qtd Itens: ${itemsCount}`);
@@ -719,16 +719,24 @@ app.post('/api/notify/ntfy-out-of-area', async (req, res) => {
     const cleanTopic = String(topic || 'bellaborda-ceps').trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'bellaborda-ceps';
     const ntfyUrl = `https://ntfy.sh/${cleanTopic}`;
 
-    console.log(`[NTFY] Despachando notificação para ${ntfyUrl} referente ao CEP ${formattedZip}`);
+    const headers: Record<string, string> = {
+      'Title': `Alerta CEP: ${formattedZip}${customerName ? ` - ${customerName}` : ''}`,
+      'Priority': 'high',
+      'Tags': 'warning,round_pushpin,pizza',
+    };
+
+    const cleanCustomerPhone = customerPhone ? String(customerPhone).replace(/\D/g, '') : '';
+    if (cleanCustomerPhone) {
+      const fullPhone = cleanCustomerPhone.length <= 11 ? `55${cleanCustomerPhone}` : cleanCustomerPhone;
+      headers['Actions'] = `view, Chamar no WhatsApp, https://wa.me/${fullPhone}`;
+    }
+
+    console.log(`[NTFY] Despachando notificação para ${ntfyUrl} referente ao CEP ${formattedZip} (Cliente: ${customerName || 'Não identificado'})`);
 
     const ntfyResponse = await fetch(ntfyUrl, {
       method: 'POST',
       body: messageLines.join('\n'),
-      headers: {
-        'Title': `Alerta CEP: ${formattedZip}`,
-        'Priority': 'high',
-        'Tags': 'warning,round_pushpin,pizza',
-      }
+      headers
     });
 
     if (!ntfyResponse.ok) {

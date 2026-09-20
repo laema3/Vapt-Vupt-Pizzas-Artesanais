@@ -1607,6 +1607,7 @@ const App: React.FC = () => {
           dbService.save('customers', newCustomer.id, newCustomer);
         }} 
         zipRanges={zipRanges} 
+        storeWhatsapp={socialLinks?.whatsapp}
       />
 
       <ProfileModal

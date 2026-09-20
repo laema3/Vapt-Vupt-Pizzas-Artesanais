@@ -56,6 +56,36 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const [neighborhood, setNeighborhood] = useState('');
   const [isFetchingAddress, setIsFetchingAddress] = useState(false);
 
+  // Nome e WhatsApp do cliente (quando não logado)
+  const [guestName, setGuestName] = useState(() => {
+    try { return localStorage.getItem('nl_guest_name') || ''; } catch { return ''; }
+  });
+  const [guestPhone, setGuestPhone] = useState(() => {
+    try { return localStorage.getItem('nl_guest_phone') || ''; } catch { return ''; }
+  });
+
+  const handleGuestNameChange = (val: string) => {
+    setGuestName(val);
+    try {
+      localStorage.setItem('nl_guest_name', val);
+    } catch (_e) {
+      // Ignora erro se localStorage estiver bloqueado
+    }
+  };
+
+  const handleGuestPhoneChange = (val: string) => {
+    setGuestPhone(val);
+    try {
+      localStorage.setItem('nl_guest_phone', val);
+    } catch (_e) {
+      // Ignora erro se localStorage estiver bloqueado
+    }
+  };
+
+  const effectiveCustomerName = currentUser?.name || (guestName.trim() ? guestName.trim() : undefined);
+  const effectiveCustomerPhone = currentUser?.phone || (guestPhone.trim() ? guestPhone.trim() : undefined);
+  const effectiveCustomerEmail = currentUser?.email || undefined;
+
   useEffect(() => {
     if (currentUser) {
       setZipCode(currentUser.zipCode || '');
@@ -113,9 +143,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
             }
             sendOutOfAreaNotification({
               zipCode: val,
-              customerName: currentUser?.name,
-              customerPhone: currentUser?.phone,
-              customerEmail: currentUser?.email,
+              customerName: effectiveCustomerName,
+              customerPhone: effectiveCustomerPhone,
+              customerEmail: effectiveCustomerEmail,
               address: foundAddress,
               neighborhood: foundNeighborhood,
               city: foundCity,
@@ -136,9 +166,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         if (onShowToast) onShowToast('CEP não localizado no sistema de Correios.', 'error');
         sendOutOfAreaNotification({
           zipCode: val,
-          customerName: currentUser?.name,
-          customerPhone: currentUser?.phone,
-          customerEmail: currentUser?.email,
+          customerName: effectiveCustomerName,
+          customerPhone: effectiveCustomerPhone,
+          customerEmail: effectiveCustomerEmail,
           address: foundAddress,
           neighborhood: foundNeighborhood || 'Não localizado nos Correios',
           city: foundCity,
@@ -210,9 +240,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         // Envia notificação imediata via ntfy ao lojista informando a tentativa de pedido com CEP não atendido
         sendOutOfAreaNotification({
           zipCode,
-          customerName: currentUser?.name,
-          customerPhone: currentUser?.phone,
-          customerEmail: currentUser?.email,
+          customerName: effectiveCustomerName,
+          customerPhone: effectiveCustomerPhone,
+          customerEmail: effectiveCustomerEmail,
           address,
           neighborhood,
           cartTotal: total,
@@ -444,6 +474,32 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide">📍 Endereço de Entrega</h4>
                       {isFetchingAddress && <span className="text-[10px] font-bold text-red-600 animate-pulse">Buscando CEP...</span>}
                     </div>
+
+                    {!currentUser && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-slate-100">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Seu Nome</label>
+                          <input 
+                            type="text" 
+                            value={guestName} 
+                            onChange={e => handleGuestNameChange(e.target.value)} 
+                            placeholder="Nome Completo" 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">WhatsApp</label>
+                          <input 
+                            type="tel" 
+                            value={guestPhone} 
+                            onChange={e => handleGuestPhoneChange(e.target.value)} 
+                            placeholder="(34) 99999-0000" 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">CEP</label>
                       <input 
@@ -477,19 +533,71 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     {zipCode && (
                       <>
                         {isZipOutOfArea ? (
-                          <div className="p-3.5 rounded-2xl bg-red-100/90 border border-red-300 text-red-800 text-xs font-bold space-y-2">
+                          <div className="p-3.5 rounded-2xl bg-red-100/90 border border-red-300 text-red-800 text-xs font-bold space-y-2.5">
                             <div className="flex items-center gap-1.5 font-black uppercase text-red-900">
                               <span className="text-base">🚫</span>
                               <span>Fora da área de entrega</span>
                             </div>
                             <p className="text-red-700 leading-relaxed text-[11px]">
-                              Infelizmente não entregamos no CEP <strong>{zipCode}</strong>.
+                              Infelizmente não realizamos entregas para o CEP <strong>{zipCode}</strong>.
                               Atendemos apenas faixas de CEP autorizadas da cidade.
                             </p>
+
+                            {/* Cartão de Contato com Nome e WhatsApp */}
+                            <div className="bg-white/95 p-3 rounded-xl border border-red-200 space-y-2 text-left">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-red-900">
+                                  Deseja consultar entrega especial?
+                                </span>
+                                <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">Aviso no ntfy</span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                <input 
+                                  type="text" 
+                                  placeholder="Seu Nome Completo" 
+                                  value={effectiveCustomerName || ''} 
+                                  onChange={e => handleGuestNameChange(e.target.value)} 
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-slate-800 placeholder:text-slate-400 focus:ring-1 focus:ring-red-500"
+                                />
+                                <input 
+                                  type="tel" 
+                                  placeholder="Seu WhatsApp com DDD" 
+                                  value={effectiveCustomerPhone || ''} 
+                                  onChange={e => handleGuestPhoneChange(e.target.value)} 
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-slate-800 placeholder:text-slate-400 focus:ring-1 focus:ring-red-500"
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  sendOutOfAreaNotification({
+                                    zipCode,
+                                    customerName: effectiveCustomerName,
+                                    customerPhone: effectiveCustomerPhone,
+                                    customerEmail: effectiveCustomerEmail,
+                                    address,
+                                    neighborhood,
+                                    cartTotal: total,
+                                    itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+                                    topic: ntfyTopic,
+                                    reason: 'Cliente solicitou consulta de entrega especial para CEP não atendido',
+                                    force: true
+                                  });
+                                  if (onShowToast) onShowToast('Notificação com seus dados enviada à pizzaria via ntfy!', 'success');
+                                }}
+                                className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-black text-[11px] uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                              >
+                                <span>🔔</span>
+                                <span>Avisar Pizzaria com meu WhatsApp</span>
+                              </button>
+                            </div>
+
                             <button 
                               type="button"
                               onClick={() => setDeliveryType('PICKUP')}
-                              className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                              className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <span>🏃</span>
                               <span>Mudar pedido para Retirada no Balcão</span>

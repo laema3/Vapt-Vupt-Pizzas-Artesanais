@@ -155,3 +155,23 @@ export interface BotSettings {
   geminiApiKey?: string;
 }
 
+export interface NtfySettings {
+  enabled?: boolean;
+  topic?: string;
+}
+
+export interface UncoveredZipLog {
+  id: string;
+  zipCode: string;
+  cleanZip?: string;
+  neighborhood?: string;
+  city?: string;
+  address?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  cartTotal?: number;
+  itemsCount?: number;
+  createdAt: string;
+}
+

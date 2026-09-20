@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange } from '../types';
 import { checkZipCoverage, fetchAddressByCep } from '../utils/zipUtils';
+import { sendOutOfAreaNotification } from '../services/ntfyService';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -34,12 +35,13 @@ interface CartSidebarProps {
   isAdmin?: boolean;
   forcedDeliveryType?: DeliveryType | null;
   zipRanges?: ZipRange[];
+  ntfyTopic?: string;
 }
 
 export const CartSidebar: React.FC<CartSidebarProps> = ({ 
   isOpen, onClose, items, coupons, onUpdateQuantity, onRemove, onCheckout, onAuthClick, 
   paymentSettings, tables, currentUser, isKioskMode, deliveryFee, availableCoupons, isStoreOpen, isProcessing,
-  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = []
+  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic
 }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -89,12 +91,40 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       setIsFetchingAddress(true);
       const res = await fetchAddressByCep(clean);
       setIsFetchingAddress(false);
+      let foundAddress = address;
+      let foundNeighborhood = neighborhood;
+      let foundCity = '';
+
       if (res && res.address) {
         setAddress(res.address);
-        if (res.neighborhood) setNeighborhood(res.neighborhood);
+        foundAddress = res.address;
+        if (res.neighborhood) {
+          setNeighborhood(res.neighborhood);
+          foundNeighborhood = res.neighborhood;
+        }
+        if (res.city) foundCity = res.city;
         if (onShowToast) onShowToast('Endereço localizado pelo CEP!', 'success');
       } else if (res && res.error) {
         if (onShowToast) onShowToast('CEP não localizado no sistema de Correios.', 'error');
+      }
+
+      // Se o CEP estiver fora da cobertura de entrega da pizzaria, notifica o lojista via ntfy
+      if (zipRanges && zipRanges.length > 0) {
+        const coverage = checkZipCoverage(clean, zipRanges);
+        if (!coverage.isCovered) {
+          sendOutOfAreaNotification({
+            zipCode: val,
+            customerName: currentUser?.name,
+            customerPhone: currentUser?.phone,
+            customerEmail: currentUser?.email,
+            address: foundAddress,
+            neighborhood: foundNeighborhood,
+            city: foundCity,
+            cartTotal: total,
+            itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+            topic: ntfyTopic
+          });
+        }
       }
     }
   };
@@ -154,6 +184,19 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       }
 
       if (zipRanges.length > 0 && !zipCoverage.isCovered) {
+        // Envia notificação imediata via ntfy ao lojista informando a tentativa de pedido com CEP não atendido
+        sendOutOfAreaNotification({
+          zipCode,
+          customerName: currentUser?.name,
+          customerPhone: currentUser?.phone,
+          customerEmail: currentUser?.email,
+          address,
+          neighborhood,
+          cartTotal: total,
+          itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+          topic: ntfyTopic
+        });
+
         const msg = `Infelizmente não realizamos entregas para o CEP ${zipCode} (fora da nossa área de atendimento). Por favor, altere para Retirada no Balcão para concluir seu pedido.`;
         if (onShowToast) onShowToast(msg, 'error');
         else alert(msg);

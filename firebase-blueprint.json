@@ -163,6 +163,26 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["dayOfWeek", "dayName", "title", "description", "image"]
+    },
+    "UncoveredZipLog": {
+      "title": "UncoveredZipLog",
+      "description": "Log of customer orders or queries for ZIP codes outside delivery range",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "zipCode": { "type": "string" },
+        "cleanZip": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "cartTotal": { "type": "number" },
+        "itemsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["zipCode", "createdAt"]
     }
   },
   "firestore": {
@@ -175,6 +195,7 @@
     "/zipRanges/{zipRangeId}": { "schema": "ZipRange", "description": "Delivery ZIP ranges" },
     "/paymentSettings/{paymentSettingId}": { "schema": "PaymentSettings", "description": "Payment configurations" },
     "/coupons/{couponId}": { "schema": "Coupon", "description": "Discount coupons" },
-    "/daily_pizza_suggestions/{suggestionId}": { "schema": "DailyPizzaSuggestion", "description": "Daily pizza suggestions for social sharing" }
+    "/daily_pizza_suggestions/{suggestionId}": { "schema": "DailyPizzaSuggestion", "description": "Daily pizza suggestions for social sharing" },
+    "/uncovered_ceps/{uncoveredCepId}": { "schema": "UncoveredZipLog", "description": "Logs of order attempts from uncovered ZIP codes" }
   }
 }

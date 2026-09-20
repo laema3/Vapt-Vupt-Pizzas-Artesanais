@@ -676,6 +676,101 @@ app.post('/api/sync-logo', (req, res) => {
   }
 });
 
+// --- ROTA DE NOTIFICAÇÃO NTFY PARA CEPS FORA DE ÁREA ---
+app.post('/api/notify/ntfy-out-of-area', async (req, res) => {
+  try {
+    const {
+      topic = 'bellaborda-ceps',
+      zipCode,
+      customerName,
+      customerPhone,
+      customerEmail,
+      neighborhood,
+      city,
+      address,
+      cartTotal,
+      itemsCount
+    } = req.body;
+
+    if (!zipCode) {
+      return res.status(400).json({ error: 'CEP é obrigatório' });
+    }
+
+    const cleanZip = String(zipCode).replace(/\D/g, '');
+    const formattedZip = cleanZip.length === 8 ? `${cleanZip.slice(0, 5)}-${cleanZip.slice(5)}` : zipCode;
+
+    const messageLines: string[] = [
+      `⚠️ TENTATIVA DE PEDIDO - CEP NÃO ATENDIDO`,
+      ``,
+      `📍 CEP: ${formattedZip}`
+    ];
+    if (neighborhood) messageLines.push(`🏘️ Bairro: ${neighborhood}`);
+    if (city) messageLines.push(`🏙️ Cidade: ${city}`);
+    if (address) messageLines.push(`🏠 Endereço: ${address}`);
+    if (customerName) messageLines.push(`👤 Cliente: ${customerName}`);
+    if (customerPhone) messageLines.push(`📞 Telefone: ${customerPhone}`);
+    if (customerEmail) messageLines.push(`✉️ E-mail: ${customerEmail}`);
+    if (cartTotal) messageLines.push(`💰 Total do Pedido: R$ ${Number(cartTotal).toFixed(2)}`);
+    if (itemsCount) messageLines.push(`🍕 Qtd Itens: ${itemsCount}`);
+    messageLines.push(`⏰ Horário: ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
+
+    const cleanTopic = String(topic || 'bellaborda-ceps').trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'bellaborda-ceps';
+    const ntfyUrl = `https://ntfy.sh/${cleanTopic}`;
+
+    console.log(`[NTFY] Despachando notificação para ${ntfyUrl} referente ao CEP ${formattedZip}`);
+
+    const ntfyResponse = await fetch(ntfyUrl, {
+      method: 'POST',
+      body: messageLines.join('\n'),
+      headers: {
+        'Title': `📍 CEP Fora de Área: ${formattedZip}`,
+        'Priority': 'high',
+        'Tags': 'warning,round_pushpin,pizza',
+      }
+    });
+
+    if (!ntfyResponse.ok) {
+      const errText = await ntfyResponse.text();
+      console.error('[NTFY] Resposta com erro do ntfy:', errText);
+      return res.status(502).json({ error: 'Falha no ntfy.sh', details: errText });
+    }
+
+    return res.json({ success: true, topic: cleanTopic });
+  } catch (err: any) {
+    console.error('[NTFY] Erro interno:', err);
+    return res.status(500).json({ error: err.message || 'Erro interno' });
+  }
+});
+
+app.post('/api/notify/ntfy-test', async (req, res) => {
+  try {
+    const { topic = 'bellaborda-ceps' } = req.body;
+    const cleanTopic = String(topic || 'bellaborda-ceps').trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'bellaborda-ceps';
+    const ntfyUrl = `https://ntfy.sh/${cleanTopic}`;
+
+    const testMsg = `🔔 Teste de Notificação ntfy da Bella Borda Pizzaria!\n\nTudo pronto! As notificações para pedidos com CEPs fora da área de entrega serão recebidas aqui.\n⏰ Horário: ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
+
+    const ntfyResponse = await fetch(ntfyUrl, {
+      method: 'POST',
+      body: testMsg,
+      headers: {
+        'Title': '✅ Teste ntfy - Bella Borda Delivery',
+        'Priority': 'default',
+        'Tags': 'white_check_mark,pizza,bell',
+      }
+    });
+
+    if (!ntfyResponse.ok) {
+      const errText = await ntfyResponse.text();
+      return res.status(502).json({ error: 'Erro no ntfy.sh', details: errText });
+    }
+
+    return res.json({ success: true, topic: cleanTopic });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Interceptor para crawlers de compartilhamento (WhatsApp, Facebook, Twitter, Telegram, etc.)
 const CRAWLER_REGEX = /whatsapp|facebookexternalhit|facebot|twitterbot|telegrambot|slackbot|linkedinbot|pinterest|discordbot/i;
 

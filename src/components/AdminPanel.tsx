@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Order, Customer, ZipRange, CategoryItem, SubCategoryItem, OrderStatus, Complement, PaymentSettings, Coupon, Table, BotSettings } from '../types.ts';
+import { Product, Order, Customer, ZipRange, CategoryItem, SubCategoryItem, OrderStatus, Complement, PaymentSettings, Coupon, Table, BotSettings, UncoveredZipLog } from '../types.ts';
 import { compressImage } from '../services/imageService.ts';
 import { dbService } from '../services/dbService.ts';
 import { writeBatch, doc } from 'firebase/firestore';
 import { PizzaPricingCalculator } from "./PizzaPricingCalculator.tsx";
 import { WeeklyPizzaSuggestions } from "./WeeklyPizzaSuggestions.tsx";
 import { BellaBotAdmin } from "./BellaBotAdmin.tsx";
-import { Eye, EyeOff, Bot, Sparkles, Send, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Bot, Sparkles, Send, CheckCircle2, AlertCircle, RefreshCw, Bell, ExternalLink, MapPin, Trash2 } from 'lucide-react';
 import { printOrderReceipt } from '../utils/printReceipt.ts';
+import { sendTestNtfyNotification } from '../services/ntfyService.ts';
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 const APP_VERSION = "v6.0 (Subcategorias & Import SQL)";
@@ -114,6 +115,10 @@ interface AdminPanelProps {
   onUpdateStoreHours: (hours: Record<number, { enabled: boolean; open: string; close: string }>) => void;
   botSettings?: BotSettings;
   onUpdateBotSettings: (settings: BotSettings) => void;
+  ntfyTopic?: string;
+  onUpdateNtfyTopic?: (topic: string) => void;
+  uncoveredCeps?: UncoveredZipLog[];
+  onDeleteUncoveredCep?: (id: string) => Promise<void>;
 }
 
 type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'bellabot' | 'ajustes';
@@ -135,7 +140,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     authSettings, onUpdateAuthSettings,
     paymentConfig, onUpdatePaymentConfig,
     storeHours, onUpdateStoreHours,
-    botSettings, onUpdateBotSettings
+    botSettings, onUpdateBotSettings,
+    ntfyTopic, onUpdateNtfyTopic,
+    uncoveredCeps, onDeleteUncoveredCep
   } = props;
 
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
@@ -143,6 +150,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [ntfyTopicInput, setNtfyTopicInput] = useState(ntfyTopic || 'bellaborda-ceps');
+  const [isTestingNtfy, setIsTestingNtfy] = useState(false);
+  const [ntfyTestStatus, setNtfyTestStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    if (ntfyTopic) {
+      setNtfyTopicInput(ntfyTopic);
+    }
+  }, [ntfyTopic]);
+
+  const handleTestNtfy = async () => {
+    setIsTestingNtfy(true);
+    setNtfyTestStatus(null);
+    try {
+      const res = await sendTestNtfyNotification(ntfyTopicInput);
+      if (res.success) {
+        setNtfyTestStatus({ type: 'success', message: `Notificação de teste enviada com sucesso para o tópico "${ntfyTopicInput}" no ntfy!` });
+      } else {
+        setNtfyTestStatus({ type: 'error', message: res.error || 'Erro ao conectar com ntfy.sh' });
+      }
+    } catch (err: any) {
+      setNtfyTestStatus({ type: 'error', message: err.message || 'Erro ao enviar notificação de teste.' });
+    } finally {
+      setIsTestingNtfy(false);
+    }
+  };
+
+  const handleSaveNtfyTopic = () => {
+    const clean = ntfyTopicInput.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'bellaborda-ceps';
+    setNtfyTopicInput(clean);
+    if (onUpdateNtfyTopic) {
+      onUpdateNtfyTopic(clean);
+    }
+    setNtfyTestStatus({ type: 'success', message: `Tópico ntfy "${clean}" salvo com sucesso!` });
+  };
   const [localStoreHours, setLocalStoreHours] = useState(storeHours || {
     0: { enabled: true, open: '18:00', close: '23:30' },
     1: { enabled: true, open: '18:00', close: '23:30' },
@@ -1547,6 +1589,164 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                        </div>
                      ))}
                   </div>
+
+                   {/* SEÇÃO NOTIFICAÇÕES NTFY PARA CEPS FORA DE ÁREA */}
+                   <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-inner">
+                            <Bell className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight">Notificações ntfy (Alertas de CEPs Não Atendidos)</h3>
+                            <p className="text-xs text-slate-500 font-medium">Receba um alerta sonoro instantâneo no seu celular ou computador sempre que um cliente tentar pedir com CEP fora da área de entrega.</p>
+                          </div>
+                        </div>
+                        <a 
+                          href={`https://ntfy.sh/${ntfyTopicInput.trim() || 'bellaborda-ceps'}`}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shadow-sm w-fit"
+                        >
+                          <ExternalLink className="w-4 h-4 text-blue-600" />
+                          Abrir Canal no ntfy.sh
+                        </a>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div className="md:col-span-2 space-y-2">
+                          <label className={labelClass}>
+                            Nome do Tópico ntfy
+                            <span className="text-[10px] text-slate-400 font-normal ml-2">Ex: bellaborda-ceps (use letras, números e traços)</span>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono select-none">ntfy.sh/</span>
+                            <input 
+                              value={ntfyTopicInput} 
+                              onChange={e => setNtfyTopicInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))} 
+                              placeholder="bellaborda-ceps" 
+                              className={`${inputClass} pl-[72px] font-mono font-bold text-slate-800`} 
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={handleSaveNtfyTopic} 
+                            className="flex-1 bg-slate-900 hover:bg-black text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm"
+                          >
+                            Salvar Tópico
+                          </button>
+                          <button 
+                            onClick={handleTestNtfy} 
+                            disabled={isTestingNtfy}
+                            className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-sm flex items-center justify-center gap-2"
+                          >
+                            {isTestingNtfy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                            Testar Alerta
+                          </button>
+                        </div>
+                      </div>
+
+                      {ntfyTestStatus && (
+                        <div className={`p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 border ${
+                          ntfyTestStatus.type === 'success' 
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                            : 'bg-red-50 text-red-800 border-red-200'
+                        }`}>
+                          {ntfyTestStatus.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" /> : <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />}
+                          <span>{ntfyTestStatus.message}</span>
+                        </div>
+                      )}
+
+                      {/* GUIA PASSO A PASSO */}
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-3">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Como receber notificações no celular ou computador:</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+                          <div className="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
+                            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black flex items-center justify-center shrink-0">1</span>
+                            <p>Instale o aplicativo <strong>ntfy</strong> (grátis no Google Play ou App Store) ou acesse ntfy.sh no navegador.</p>
+                          </div>
+                          <div className="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
+                            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black flex items-center justify-center shrink-0">2</span>
+                            <p>Toque no botão <strong>+ (Inscrever-se no tópico)</strong> e digite o mesmo nome: <strong>{ntfyTopicInput || 'bellaborda-ceps'}</strong>.</p>
+                          </div>
+                          <div className="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
+                            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black flex items-center justify-center shrink-0">3</span>
+                            <p>Pronto! Sempre que alguém tentar pedir com CEP fora da área, seu celular vai apitar na hora com os detalhes do CEP e do pedido.</p>
+                          </div>
+                        </div>
+                      </div>
+                   </div>
+
+                   {/* HISTÓRICO DE CEPS SOLICITADOS FORA DA ÁREA */}
+                   <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
+                            <MapPin className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-wider">Tentativas de Pedidos Fora da Área</h3>
+                            <p className="text-xs text-slate-500 font-medium">Histórico dos clientes que tentaram pedir para regiões ainda não atendidas.</p>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">
+                          {uncoveredCeps?.length || 0} tentativa(s)
+                        </span>
+                      </div>
+
+                      {(!uncoveredCeps || uncoveredCeps.length === 0) ? (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-medium">
+                          Nenhum CEP fora da área registrado até o momento. Quando um cliente tentar finalizar para um CEP não autorizado, ele aparecerá aqui e você receberá uma notificação pelo ntfy!
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 max-h-[420px] overflow-y-auto pr-1">
+                          {uncoveredCeps.map(item => (
+                            <div key={item.id} className="bg-slate-50 hover:bg-slate-100/80 p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 transition">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-black text-slate-900 text-sm bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                                    CEP: {item.zipCode}
+                                  </span>
+                                  {item.neighborhood && (
+                                    <span className="text-xs font-bold text-slate-700 bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200">
+                                      {item.neighborhood}
+                                    </span>
+                                  )}
+                                  {item.city && (
+                                    <span className="text-xs text-slate-500 font-medium">
+                                      ({item.city})
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                                  {item.customerName && <span>Cliente: <strong className="text-slate-700">{item.customerName}</strong></span>}
+                                  {item.customerPhone && <span>Tel: <strong className="text-slate-700">{item.customerPhone}</strong></span>}
+                                  {item.cartTotal ? <span>Valor: <strong className="text-red-600">R$ {Number(item.cartTotal).toFixed(2)}</strong></span> : null}
+                                  {item.itemsCount ? <span>({item.itemsCount} itens)</span> : null}
+                                  {item.address && <span className="truncate max-w-xs">{item.address}</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 self-end md:self-center shrink-0">
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {item.createdAt ? new Date(item.createdAt).toLocaleString('pt-BR') : ''}
+                                </span>
+                                {onDeleteUncoveredCep && (
+                                  <button 
+                                    onClick={() => onDeleteUncoveredCep(item.id)}
+                                    title="Remover este registro"
+                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                   </div>
                </div>
             )}
 

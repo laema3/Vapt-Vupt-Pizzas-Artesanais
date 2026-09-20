@@ -24,7 +24,8 @@ import { dbService } from './services/dbService.ts';
 import { connectionError } from './firebaseConfig';
 import { calculateDeliveryFeeForZip, checkZipCoverage } from './utils/zipUtils.ts';
 import { isStoreCurrentlyOpen } from './utils/storeHoursUtils.ts';
-import { Product, CartItem, Order, Customer, ZipRange, PaymentSettings, CategoryItem, SubCategoryItem, Complement, DeliveryType, Coupon, Table, BotSettings } from './types.ts';
+import { sendOutOfAreaNotification } from './services/ntfyService.ts';
+import { Product, CartItem, Order, Customer, ZipRange, PaymentSettings, CategoryItem, SubCategoryItem, Complement, DeliveryType, Coupon, Table, BotSettings, UncoveredZipLog } from './types.ts';
 import { safeStorage } from './utils/safeStorage.ts';
 import { DEFAULT_LOGO } from './constants.tsx';
 
@@ -221,6 +222,8 @@ const App: React.FC = () => {
   const [isOrderProcessing, setIsOrderProcessing] = useState(false);
   const [waitingForPaymentOrderId, setWaitingForPaymentOrderId] = useState<string | null>(null);
   const [tableId, setTableId] = useState<string | undefined>(undefined);
+  const [ntfyTopic, setNtfyTopic] = useState<string>('bellaborda-ceps');
+  const [uncoveredCeps, setUncoveredCeps] = useState<UncoveredZipLog[]>([]);
 
   const previousOrdersRef = useRef<Order[]>([]);
 
@@ -410,6 +413,11 @@ const App: React.FC = () => {
       }),
       dbService.subscribe<Coupon[]>('coupons', (data) => data && setCoupons(data)),
       dbService.subscribe<Table[]>('tables', (data) => data && setTables(data.sort((a, b) => a.number.localeCompare(b.number)))),
+      dbService.subscribe<UncoveredZipLog[]>('uncovered_ceps', (data) => {
+        if (data) {
+          setUncoveredCeps([...data].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
+        }
+      }),
       dbService.subscribe<any[]>('settings', (data) => {
         console.log("[App] Settings data received:", data);
         if (data && data.length > 0) {
@@ -419,6 +427,7 @@ const App: React.FC = () => {
             if (settings.isMaintenanceMode !== undefined) setIsMaintenanceMode(settings.isMaintenanceMode);
             if (settings.logoUrl) setLogoUrl(settings.logoUrl);
             if (settings.storeName) setStoreName(settings.storeName);
+            if (settings.ntfyTopic) setNtfyTopic(settings.ntfyTopic);
             if (settings.storeHours) {
               setStoreHours(settings.storeHours);
               const openNow = isStoreCurrentlyOpen(settings.storeHours);
@@ -539,6 +548,7 @@ const App: React.FC = () => {
                     if (settings.isMaintenanceMode !== undefined) setIsMaintenanceMode(settings.isMaintenanceMode);
                     if (settings.logoUrl) setLogoUrl(settings.logoUrl);
                     if (settings.storeName) setStoreName(settings.storeName);
+                    if (settings.ntfyTopic) setNtfyTopic(settings.ntfyTopic);
                     if (settings.themeColor) { setThemeColor(settings.themeColor); safeStorage.setItem('nl_theme_color', settings.themeColor); }
                     setSocialLinks({ 
                       instagram: settings.instagram || '', whatsapp: settings.whatsapp || '', facebook: settings.facebook || '',
@@ -809,6 +819,17 @@ const App: React.FC = () => {
       const targetZip = deliveryAddressInfo?.zipCode || effectiveUser?.zipCode || '';
       const coverage = checkZipCoverage(targetZip, zipRanges);
       if (!coverage.isCovered) {
+        sendOutOfAreaNotification({
+          zipCode: targetZip,
+          customerName: effectiveUser?.name || currentUser?.name,
+          customerPhone: effectiveUser?.phone || currentUser?.phone,
+          customerEmail: effectiveUser?.email || currentUser?.email,
+          address: deliveryAddressInfo?.address || effectiveUser?.address,
+          neighborhood: deliveryAddressInfo?.neighborhood || effectiveUser?.neighborhood,
+          cartTotal: cart.reduce((acc, i) => acc + (i.price * i.quantity), 0),
+          itemsCount: cart.reduce((acc, i) => acc + i.quantity, 0),
+          topic: ntfyTopic
+        });
         setToast({ 
           show: true, 
           msg: `Infelizmente não realizamos entregas para o CEP ${targetZip || ''} (fora da área atendida). Por favor, selecione a opção de Retirada no Balcão.`, 
@@ -1322,6 +1343,15 @@ const App: React.FC = () => {
               safeStorage.setItem('nl_bot_settings', JSON.stringify(newBotSettings));
               dbService.save('settings', 'general', { botSettings: newBotSettings });
             }}
+            ntfyTopic={ntfyTopic}
+            onUpdateNtfyTopic={(topic) => {
+              setNtfyTopic(topic);
+              dbService.save('settings', 'general', { ntfyTopic: topic });
+            }}
+            uncoveredCeps={uncoveredCeps}
+            onDeleteUncoveredCep={async (id) => {
+              await dbService.remove('uncovered_ceps', id);
+            }}
             onLogout={() => { 
               setShowAdminPanel(false); 
               setIsAdminAuthenticated(false);
@@ -1552,6 +1582,7 @@ const App: React.FC = () => {
         isAdmin={isAdminAuthenticated}
         forcedDeliveryType={forcedDeliveryType}
         zipRanges={zipRanges}
+        ntfyTopic={ntfyTopic}
       />
       <ProductModal 
         product={selectedProduct} 

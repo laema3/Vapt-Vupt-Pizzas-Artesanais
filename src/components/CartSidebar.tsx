@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange } from '../types';
 import { checkZipCoverage, fetchAddressByCep } from '../utils/zipUtils';
 import { sendOutOfAreaNotification } from '../services/ntfyService';
@@ -51,6 +51,18 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(defaultTableId ? 'TABLE' : null);
   const [selectedTableId, setSelectedTableId] = useState<string>(defaultTableId || '');
   const [orderObservations, setOrderObservations] = useState('');
+
+  const observationsRef = useRef<HTMLDivElement>(null);
+  const paymentRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
+    setTimeout(() => {
+      if (ref.current) {
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
+  };
 
   // Endereço e CEP para entrega
   const [zipCode, setZipCode] = useState('');
@@ -450,7 +462,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   {!defaultTableId && (
                     <>
                       <button 
-                        onClick={() => setDeliveryType('DELIVERY')} 
+                        onClick={() => {
+                          setDeliveryType('DELIVERY');
+                          scrollToSection(observationsRef);
+                        }} 
                         className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm ${deliveryType === 'DELIVERY' ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide flex items-center gap-2">
@@ -459,7 +474,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                         {deliveryType === 'DELIVERY' && <span className="text-red-600 font-bold">●</span>}
                       </button>
                       <button 
-                        onClick={() => setDeliveryType('PICKUP')} 
+                        onClick={() => {
+                          setDeliveryType('PICKUP');
+                          scrollToSection(observationsRef);
+                        }} 
                         className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm ${deliveryType === 'PICKUP' ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide flex items-center gap-2">
@@ -631,7 +649,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                 {appliedCoupon && <p className="text-xs font-bold text-red-600 flex items-center gap-1">✅ Cupom {appliedCoupon.code} aplicado!</p>}
               </div>
 
-              <div className="space-y-3">
+              <div ref={observationsRef} className="space-y-3">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Observações do Pedido</h3>
                 <div className="space-y-2">
                   <textarea 
@@ -643,7 +661,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   />
                   <button 
                     type="button"
-                    onClick={() => setOrderObservations('')}
+                    onClick={() => {
+                      setOrderObservations('');
+                      scrollToSection(paymentRef);
+                    }}
                     className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <span>🚫</span>
@@ -652,7 +673,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div ref={paymentRef} className="space-y-3">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Pagamento</h3>
                 {deliveryType === 'TABLE' ? (
                   <div className="bg-red-50 border border-red-200 p-4 rounded-xl text-red-800 text-xs font-bold uppercase tracking-widest text-center">
@@ -664,7 +685,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     {paymentSettings.filter(p => p.enabled && (p.type === 'ONLINE' || p.integration === 'MERCADO_PAGO' || p.integration === 'PAGSEGURO')).map(method => (
                       <button 
                         key={method.id}
-                        onClick={() => setPaymentMethod(method.name)}
+                        onClick={() => {
+                          setPaymentMethod(method.name);
+                          scrollToSection(confirmRef);
+                        }}
                         className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm ${paymentMethod === method.name ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide flex items-center gap-2">
@@ -678,7 +702,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     {paymentSettings.filter(p => p.enabled && p.type !== 'ONLINE' && p.integration !== 'MERCADO_PAGO' && p.integration !== 'PAGSEGURO').map(method => (
                       <button 
                         key={method.id}
-                        onClick={() => setPaymentMethod(method.name)}
+                        onClick={() => {
+                          setPaymentMethod(method.name);
+                          scrollToSection(confirmRef);
+                        }}
                         className={`w-full text-left px-4 py-3 rounded-xl border transition-all flex items-center justify-between ${paymentMethod === method.name ? 'border-red-500 bg-red-50 text-red-800' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide">
@@ -707,7 +734,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         </div>
 
         {items.length > 0 && (
-          <div className="p-6 bg-red-600 border-t border-red-500 space-y-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] z-20 text-white">
+          <div ref={confirmRef} className="p-6 bg-red-600 border-t border-red-500 space-y-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] z-20 text-white">
             <div className="space-y-2 text-xs font-bold text-red-100">
               <div className="flex justify-between"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>
               {deliveryType === 'DELIVERY' && <div className="flex justify-between"><span>Taxa de Entrega</span><span>R$ {activeDeliveryFee.toFixed(2)}</span></div>}

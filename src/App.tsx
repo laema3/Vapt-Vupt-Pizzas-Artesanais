@@ -815,7 +815,8 @@ const App: React.FC = () => {
     deliveryType: DeliveryType, 
     changeFor?: number, 
     tableId?: string,
-    deliveryAddressInfo?: { address: string; neighborhood: string; zipCode: string }
+    deliveryAddressInfo?: { address: string; neighborhood: string; zipCode: string },
+    orderObservations?: string
   ) => {
     console.log("handleCheckout iniciado. Método:", paymentMethod);
     
@@ -1011,7 +1012,8 @@ const App: React.FC = () => {
                  pointsEarned: Math.floor(total || 0), 
                  changeFor: changeFor || 0, 
                  discountValue: discount || 0, 
-                 couponCode: couponCode || ''
+                 couponCode: couponCode || '',
+                 observations: orderObservations || ''
                };
                
                const orderToSave = JSON.parse(JSON.stringify(newOrder));
@@ -1071,7 +1073,8 @@ const App: React.FC = () => {
                  pointsEarned: Math.floor(total || 0), 
                  changeFor: changeFor || 0, 
                  discountValue: discount || 0, 
-                 couponCode: couponCode || ''
+                 couponCode: couponCode || '',
+                 observations: orderObservations || ''
                };
                
                const orderToSave = JSON.parse(JSON.stringify(newOrder));
@@ -1177,7 +1180,8 @@ const App: React.FC = () => {
           id: orderId, customerId: currentUser?.email || 'kiosk', customerName: currentUser?.name || 'Cliente Local', customerPhone: currentUser?.phone || '000',
           customerAddress: resolvedAddress,
           items: [...cart], total, deliveryFee: fee, deliveryType: (isKioskMode && deliveryType !== 'TABLE') ? 'PICKUP' : deliveryType, status: 'NOVO', paymentMethod: deliveryType === 'TABLE' ? 'PAGAMENTO NO BALCÃO' : paymentMethod, createdAt: new Date().toISOString(), pointsEarned: Math.floor(total), changeFor: changeFor || 0, discountValue: discount || 0, couponCode: couponCode || '', tableId: tableId || '', orderNumber: nextOrderNumber,
-          estimatedMinutes: socialLinks.orderEstimatedMinutes || 30
+          estimatedMinutes: socialLinks.orderEstimatedMinutes || 30,
+          observations: orderObservations || ''
         };
         
         // Remove campos opcionais que podem ser undefined

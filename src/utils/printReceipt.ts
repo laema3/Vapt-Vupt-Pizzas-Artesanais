@@ -133,6 +133,7 @@ export function printOrderReceipt(order: Order, storeName?: string, socialLinks?
           ${order.changeFor ? `<p><strong>Troco p/:</strong> R$ ${order.changeFor.toFixed(2)}</p>` : ''}
           ${order.deliveryType === 'DELIVERY' ? `<p><strong>End:</strong> ${order.customerAddress}</p>` : (order.deliveryType === 'TABLE' ? `<p><strong>${order.customerAddress}</strong></p>` : '<p><strong>RETIRADA NO BALCÃO</strong></p>')}
           ${order.couponCode ? `<p><strong>Cupom:</strong> ${order.couponCode}</p>` : ''}
+          ${order.observations ? `<p><strong>Obs:</strong> ${order.observations}</p>` : ''}
         </div>
         <div class="items">${itemsHtml}</div>
         <div class="totals">

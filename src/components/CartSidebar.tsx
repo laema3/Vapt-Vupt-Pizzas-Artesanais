@@ -19,7 +19,8 @@ interface CartSidebarProps {
     deliveryType: DeliveryType, 
     changeFor?: number, 
     tableId?: string,
-    deliveryAddressInfo?: { address: string; neighborhood: string; zipCode: string }
+    deliveryAddressInfo?: { address: string; neighborhood: string; zipCode: string },
+    orderObservations?: string
   ) => void;
   onAuthClick: () => void;
   paymentSettings: PaymentSettings[];
@@ -49,6 +50,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const [changeFor, setChangeFor] = useState<number | undefined>(undefined);
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(defaultTableId ? 'TABLE' : null);
   const [selectedTableId, setSelectedTableId] = useState<string>(defaultTableId || '');
+  const [orderObservations, setOrderObservations] = useState('');
 
   // Endereço e CEP para entrega
   const [zipCode, setZipCode] = useState('');
@@ -301,7 +303,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       deliveryType, 
       changeFor, 
       selectedTableId,
-      deliveryAddressInfo
+      deliveryAddressInfo,
+      orderObservations
     );
   };
 
@@ -626,6 +629,27 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   <button onClick={handleApplyCoupon} className="bg-red-600 text-white px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors">Aplicar</button>
                 </div>
                 {appliedCoupon && <p className="text-xs font-bold text-red-600 flex items-center gap-1">✅ Cupom {appliedCoupon.code} aplicado!</p>}
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Observações do Pedido</h3>
+                <div className="space-y-2">
+                  <textarea 
+                    value={orderObservations}
+                    onChange={(e) => setOrderObservations(e.target.value)}
+                    placeholder="Ex: Sem cebola, caprichar no molho, campainha quebrada..."
+                    rows={2}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 resize-none shadow-sm"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setOrderObservations('')}
+                    className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>🚫</span>
+                    <span>Sem Observações</span>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">

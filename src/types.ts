@@ -90,6 +90,7 @@ export interface Order {
   tableId?: string; // NOVO: ID da mesa se for pedido na mesa
   orderNumber?: number; // NOVO: Número sequencial do pedido
   estimatedMinutes?: number; // Tempo estimado do pedido em minutos configurado no painel
+  observations?: string; // NOVO: Observações do pedido escritas pelo cliente
 }
 
 export interface Customer {

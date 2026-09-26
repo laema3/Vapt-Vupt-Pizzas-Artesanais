@@ -14,6 +14,7 @@ import { OrderSuccessModal } from './components/OrderSuccessModal.tsx';
 import { ChatBot } from './components/ChatBot.tsx';
 import { WaiterDashboard } from './components/WaiterDashboard.tsx';
 import { OpeningCepModal } from './components/OpeningCepModal.tsx';
+import { ScheduleConsultModal } from './components/ScheduleConsultModal.tsx';
 
 import { Footer } from './components/Footer.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
@@ -230,6 +231,7 @@ const App: React.FC = () => {
     if (window.location.pathname.startsWith('/mesa/')) return false;
     return safeStorage.getItem('nl_opening_cep_verified') !== 'true';
   });
+  const [cepModalInitialStep, setCepModalInitialStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>('INPUT');
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
 
   const handleOpeningCepVerified = (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number, schedTime?: string | null) => {
@@ -1329,7 +1331,8 @@ const App: React.FC = () => {
           }
         }} 
         searchTerm={searchTerm} onSearchChange={setSearchTerm} currentUser={currentUser} onAuthClick={() => setIsAuthModalOpen(true)} onLogout={() => { setCurrentUser(null); safeStorage.removeItem('nl_current_user'); }} onMyOrdersClick={() => setActiveView('my-orders')} onProfileClick={() => setIsProfileModalOpen(true)} isStoreOpen={isStoreOpen} logoUrl={logoUrl} storeName={storeName}
-        onConsultCepClick={() => setIsOpeningCepModalOpen(true)}
+        onConsultCepClick={() => { setCepModalInitialStep('INPUT'); setIsOpeningCepModalOpen(true); }}
+        onConsultScheduleClick={() => { setCepModalInitialStep('CHOICE'); setIsOpeningCepModalOpen(true); }}
       />
 
       <main className="flex-1 w-full relative">
@@ -1645,6 +1648,7 @@ const App: React.FC = () => {
         orders={orders}
         storeName={storeName}
         logoUrl={logoUrl}
+        initialStep={cepModalInitialStep}
         onVerifySuccess={handleOpeningCepVerified}
         onChoosePickup={handleOpeningCepChoosePickup}
         onLogUncoveredCep={(cep) => {

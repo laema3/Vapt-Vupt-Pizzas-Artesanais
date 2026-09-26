@@ -21,12 +21,13 @@ interface NavbarProps {
   isWaiter?: boolean;
   onBackToTables?: () => void;
   onConsultCepClick?: () => void;
+  onConsultScheduleClick?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ 
   cartCount, onCartClick, isAdmin, isKioskMode, onToggleAdmin, searchTerm, onSearchChange, 
   currentUser, onAuthClick, onLogout, onMyOrdersClick, onProfileClick, isStoreOpen, logoUrl, storeName = 'BELLA BORDA',
-  isWaiter, onBackToTables, onConsultCepClick
+  isWaiter, onBackToTables, onConsultCepClick, onConsultScheduleClick
 }) => {
   return (
     <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
@@ -91,6 +92,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     <span>📍</span>
                     <span>Consultar CEP</span>
+                  </button>
+                )}
+
+                {onConsultScheduleClick && (
+                  <button 
+                    onClick={onConsultScheduleClick}
+                    className="hidden sm:flex items-center gap-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+                    title="Consultar horários de agendamento"
+                  >
+                    <span>📅</span>
+                    <span>Consultar Agendamento</span>
                   </button>
                 )}
 

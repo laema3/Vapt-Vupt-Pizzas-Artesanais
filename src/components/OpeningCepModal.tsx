@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ZipRange, Order } from '../types';
 import { checkZipCoverage, fetchAddressByCep } from '../utils/zipUtils';
+import { safeStorage } from '../utils/safeStorage';
 
 interface OpeningCepModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface OpeningCepModalProps {
   orders?: Order[];
   storeName?: string;
   logoUrl?: string;
+  initialStep?: 'INPUT' | 'CHOICE' | 'SCHEDULE';
   onVerifySuccess: (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number, scheduledTime?: string | null) => void;
   onChoosePickup: (scheduledTime?: string | null) => void;
   onLogUncoveredCep?: (cep: string) => void;
@@ -23,13 +25,14 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   orders = [],
   storeName = 'Bella Borda',
   logoUrl,
+  initialStep = 'INPUT',
   onVerifySuccess,
   onChoosePickup,
   onLogUncoveredCep
 }) => {
   const [cepInput, setCepInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [modalStep, setModalStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>('INPUT');
+  const [modalStep, setModalStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>(initialStep);
   const [pendingAction, setPendingAction] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
   const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -39,6 +42,22 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
     addressInfo?: { address?: string; neighborhood?: string; city?: string };
     error?: string;
   }>({ checked: false, isCovered: false, fee: 0 });
+
+  useEffect(() => {
+    if (isOpen) {
+      setModalStep(initialStep);
+      const savedCep = safeStorage.getItem('nl_opening_cep');
+      if (savedCep) {
+        setCepInput(savedCep);
+        const coverage = checkZipCoverage(savedCep, zipRanges);
+        setResult({
+          checked: true,
+          isCovered: coverage.isCovered,
+          fee: coverage.fee
+        });
+      }
+    }
+  }, [isOpen, initialStep, zipRanges]);
 
   if (!isOpen) return null;
 

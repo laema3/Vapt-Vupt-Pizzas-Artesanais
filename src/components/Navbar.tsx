@@ -87,22 +87,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {onConsultCepClick && (
                   <button 
                     onClick={onConsultCepClick}
-                    className="hidden sm:flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+                    className="flex items-center gap-1 bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
                     title="Consultar disponibilidade de entrega por CEP"
                   >
                     <span>📍</span>
-                    <span>Consultar CEP</span>
+                    <span className="hidden md:inline">Consultar CEP</span>
+                    <span className="md:hidden">CEP</span>
                   </button>
                 )}
 
                 {onConsultScheduleClick && (
                   <button 
                     onClick={onConsultScheduleClick}
-                    className="hidden sm:flex items-center gap-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+                    className="flex items-center gap-1 bg-rose-100 hover:bg-rose-200 text-rose-900 px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
                     title="Consultar horários de agendamento"
                   >
                     <span>📅</span>
-                    <span>Consultar Agendamento</span>
+                    <span className="hidden md:inline">Consultar Agendamento</span>
+                    <span className="md:hidden">Agenda</span>
                   </button>
                 )}
 

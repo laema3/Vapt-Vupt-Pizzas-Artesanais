@@ -1642,6 +1642,7 @@ const App: React.FC = () => {
       <OpeningCepModal
         isOpen={isOpeningCepModalOpen}
         zipRanges={zipRanges}
+        orders={orders}
         storeName={storeName}
         logoUrl={logoUrl}
         onVerifySuccess={handleOpeningCepVerified}

@@ -141,6 +141,9 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
       alert(`⚠️ Este horário (${slot}) já está reservado por outro cliente. Por favor, escolha outro horário disponível.`);
       return;
     }
+    if (!window.confirm(`CONFIRMA ESSE HORÁRIO PARA O PEDIDO (${slot})?`)) {
+      return;
+    }
     if (pendingAction === 'DELIVERY') {
       onVerifySuccess(cepInput, result.addressInfo || {}, result.fee, slot);
     } else {
@@ -151,7 +154,7 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   // Gera horários a partir de uma hora base até 20:00 de hora em hora
   const getSubHours = (baseHourStr: string) => {
     const [h] = baseHourStr.split(':').map(Number);
-    const startH = h + 2;
+    const startH = h + 1;
     const hours: string[] = [];
     for (let current = startH; current <= 20; current++) {
       hours.push(`${String(current).padStart(2, '0')}:00`);

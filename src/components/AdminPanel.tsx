@@ -907,6 +907,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                                {order.deliveryType === 'DELIVERY' && <div className="text-xs font-medium text-slate-500 bg-slate-50 p-3 rounded-lg flex items-center gap-2"><span>📍</span> {order.customerAddress}</div>}
                             </div>
                             <div className="mt-6 pt-6 border-t border-slate-100">
+                                {order.scheduledTime && (
+                                  <div className="mb-4 p-3 bg-amber-100 border border-amber-300 rounded-xl text-amber-950 text-xs font-bold flex items-start gap-2 shadow-sm">
+                                    <span className="text-base">📅</span>
+                                    <div>
+                                      <span className="uppercase text-[10px] font-black text-amber-900 block">Horário Agendado:</span>
+                                      <span>{order.scheduledTime} (Previsão de entrega/preparo 2h após: {(() => {
+                                        const [h, m] = order.scheduledTime.split(':').map(Number);
+                                        const newH = (h + 2) % 24;
+                                        return `${String(newH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+                                      })()})</span>
+                                    </div>
+                                  </div>
+                                )}
                                 {order.observations && (
                                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs font-bold flex items-start gap-2 shadow-sm">
                                     <span className="text-base">📝</span>

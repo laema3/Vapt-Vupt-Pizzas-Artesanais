@@ -230,10 +230,12 @@ const App: React.FC = () => {
     if (window.location.pathname.startsWith('/mesa/')) return false;
     return safeStorage.getItem('nl_opening_cep_verified') !== 'true';
   });
+  const [scheduledTime, setScheduledTime] = useState<string | null>(null);
 
-  const handleOpeningCepVerified = (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number) => {
+  const handleOpeningCepVerified = (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number, schedTime?: string | null) => {
     safeStorage.setItem('nl_opening_cep_verified', 'true');
     safeStorage.setItem('nl_opening_cep', cep);
+    if (schedTime !== undefined) setScheduledTime(schedTime || null);
     setIsOpeningCepModalOpen(false);
 
     if (currentUser) {
@@ -246,14 +248,15 @@ const App: React.FC = () => {
       setCurrentUser(updated);
       safeStorage.setItem('nl_current_user', JSON.stringify(updated));
     }
-    setToast({ show: true, msg: `CEP ${cep} verificado com sucesso! Bom apetite!`, type: 'success' });
+    setToast({ show: true, msg: schedTime ? `Pedido agendado para as ${schedTime}! Bom apetite!` : `CEP ${cep} verificado com sucesso! Bom apetite!`, type: 'success' });
   };
 
-  const handleOpeningCepChoosePickup = () => {
+  const handleOpeningCepChoosePickup = (schedTime?: string | null) => {
     safeStorage.setItem('nl_opening_cep_verified', 'true');
+    if (schedTime !== undefined) setScheduledTime(schedTime || null);
     setForcedDeliveryType('PICKUP');
     setIsOpeningCepModalOpen(false);
-    setToast({ show: true, msg: 'Modo Retirada no Balcão selecionado!', type: 'success' });
+    setToast({ show: true, msg: schedTime ? `Retirada agendada para as ${schedTime}!` : 'Modo Retirada no Balcão selecionado!', type: 'success' });
   };
 
   const previousOrdersRef = useRef<Order[]>([]);
@@ -1013,7 +1016,8 @@ const App: React.FC = () => {
                  changeFor: changeFor || 0, 
                  discountValue: discount || 0, 
                  couponCode: couponCode || '',
-                 observations: orderObservations || ''
+                 observations: orderObservations || '',
+                 scheduledTime: scheduledTime || undefined
                };
                
                const orderToSave = JSON.parse(JSON.stringify(newOrder));
@@ -1074,7 +1078,8 @@ const App: React.FC = () => {
                  changeFor: changeFor || 0, 
                  discountValue: discount || 0, 
                  couponCode: couponCode || '',
-                 observations: orderObservations || ''
+                 observations: orderObservations || '',
+                 scheduledTime: scheduledTime || undefined
                };
                
                const orderToSave = JSON.parse(JSON.stringify(newOrder));
@@ -1181,7 +1186,8 @@ const App: React.FC = () => {
           customerAddress: resolvedAddress,
           items: [...cart], total, deliveryFee: fee, deliveryType: (isKioskMode && deliveryType !== 'TABLE') ? 'PICKUP' : deliveryType, status: 'NOVO', paymentMethod: deliveryType === 'TABLE' ? 'PAGAMENTO NO BALCÃO' : paymentMethod, createdAt: new Date().toISOString(), pointsEarned: Math.floor(total), changeFor: changeFor || 0, discountValue: discount || 0, couponCode: couponCode || '', tableId: tableId || '', orderNumber: nextOrderNumber,
           estimatedMinutes: socialLinks.orderEstimatedMinutes || 30,
-          observations: orderObservations || ''
+          observations: orderObservations || '',
+          scheduledTime: scheduledTime || undefined
         };
         
         // Remove campos opcionais que podem ser undefined
@@ -1621,6 +1627,7 @@ const App: React.FC = () => {
         forcedDeliveryType={forcedDeliveryType}
         zipRanges={zipRanges}
         ntfyTopic={ntfyTopic}
+        scheduledTime={scheduledTime}
       />
       <ProductModal 
         product={selectedProduct} 

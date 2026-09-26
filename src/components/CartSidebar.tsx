@@ -37,12 +37,13 @@ interface CartSidebarProps {
   forcedDeliveryType?: DeliveryType | null;
   zipRanges?: ZipRange[];
   ntfyTopic?: string;
+  scheduledTime?: string | null;
 }
 
 export const CartSidebar: React.FC<CartSidebarProps> = ({ 
   isOpen, onClose, items, coupons, onUpdateQuantity, onRemove, onCheckout, onAuthClick, 
   paymentSettings, tables, currentUser, isKioskMode, deliveryFee, availableCoupons, isStoreOpen, isProcessing,
-  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic
+  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic, scheduledTime
 }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -339,6 +340,21 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
+              {scheduledTime && (
+                <div className="bg-amber-100 border-2 border-amber-300 p-4 rounded-2xl text-amber-950 text-xs font-bold space-y-1.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 font-black uppercase text-amber-950">
+                    <span className="text-base">📅</span>
+                    <span>Pedido Agendado para as {scheduledTime}</span>
+                  </div>
+                  <p className="text-amber-900/90 text-[11px] leading-relaxed">
+                    Previsão de {deliveryType === 'PICKUP' ? 'retirada' : 'entrega'} / preparo: <strong>2 horas após</strong> (às {(() => {
+                      const [h, m] = scheduledTime.split(':').map(Number);
+                      const newH = (h + 2) % 24;
+                      return `${String(newH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+                    })()}).
+                  </p>
+                </div>
+              )}
               {items.map(item => (
                 <div key={item.id} className="flex gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-xs">
                   <div className="w-20 h-20 bg-white rounded-xl shrink-0 overflow-hidden p-1 flex items-center justify-center border border-slate-100">

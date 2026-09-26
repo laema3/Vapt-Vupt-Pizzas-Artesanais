@@ -91,6 +91,7 @@ export interface Order {
   orderNumber?: number; // NOVO: Número sequencial do pedido
   estimatedMinutes?: number; // Tempo estimado do pedido em minutos configurado no painel
   observations?: string; // NOVO: Observações do pedido escritas pelo cliente
+  scheduledTime?: string; // NOVO: Horário agendado para o pedido
 }
 
 export interface Customer {

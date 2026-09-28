@@ -16,8 +16,10 @@ interface OpeningCepModalProps {
 }
 
 const ALL_SCHEDULE_HOURS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', 
-  '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', 
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', 
+  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'
 ];
 
 export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
@@ -132,21 +134,30 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
     }
   };
 
-  const isSlotReserved = (slot: string) => {
-    return orders.some(o => o.scheduledTime === slot && o.status !== 'CANCELADO' && o.status !== 'FINALIZADO');
+  const getSlotReservedCount = (slot: string) => {
+    return orders.filter(o => o.scheduledTime === slot && o.status !== 'CANCELADO' && o.status !== 'FINALIZADO').length;
+  };
+
+  const getDeliveryTime = (slot: string) => {
+    const [h, m] = slot.split(':').map(Number);
+    const totalMinutes = h * 60 + m + 120; // 2 hours later
+    const delH = Math.floor(totalMinutes / 60) % 24;
+    const delM = totalMinutes % 60;
+    return `${String(delH).padStart(2, '0')}:${String(delM).padStart(2, '0')}`;
   };
 
   const isSlotPassed = (slot: string) => {
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
-    const [slotHour] = slot.split(':').map(Number);
-    return currentHour > slotHour || (currentHour === slotHour && currentMinute > 0);
+    const [slotHour, slotMinute] = slot.split(':').map(Number);
+    return currentHour > slotHour || (currentHour === slotHour && currentMinute > slotMinute);
   };
 
   const handleFinalizeScheduled = (slot: string) => {
-    if (isSlotReserved(slot)) {
-      alert(`⚠️ Este horário (${slot}) já está reservado por outro cliente. Por favor, escolha outro horário disponível.`);
+    const count = getSlotReservedCount(slot);
+    if (count >= 3) {
+      alert(`⚠️ Este horário (${slot}) já atingiu a capacidade máxima de 3 pedidos. Por favor, escolha outro horário disponível.`);
       return;
     }
     if (isSlotPassed(slot)) {
@@ -351,10 +362,12 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1">
                 {ALL_SCHEDULE_HOURS.map((slot) => {
-                  const reserved = isSlotReserved(slot);
+                  const count = getSlotReservedCount(slot);
+                  const remaining = 3 - count;
+                  const isFull = remaining <= 0;
                   const passed = isSlotPassed(slot);
-                  const isDisabled = reserved || passed;
-                  const deliveryHour = (Number(slot.split(':')[0]) + 2).toString().padStart(2, '0');
+                  const isDisabled = isFull || passed;
+                  const deliveryTimeStr = getDeliveryTime(slot);
 
                   return (
                     <button
@@ -364,13 +377,20 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                       className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${
                         isDisabled
                           ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
-                          : 'bg-white hover:bg-red-600 hover:text-white border-slate-200 text-slate-900 shadow-sm cursor-pointer'
+                          : 'bg-white hover:bg-red-600 hover:text-white border-slate-200 text-slate-900 shadow-sm cursor-pointer group'
                       }`}
                     >
                       <span className="font-black text-sm uppercase">🕒 {slot}</span>
-                      <span className="text-[9px] font-bold opacity-80">Entrega {deliveryHour}:00</span>
-                      {reserved && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black mt-0.5">RESERVADO</span>}
-                      {passed && !reserved && <span className="text-[8px] bg-slate-300 text-slate-600 px-1.5 py-0.5 rounded font-black mt-0.5">JÁ PASSOU</span>}
+                      <span className="text-[9px] font-bold opacity-80 group-hover:text-red-100">Entrega {deliveryTimeStr}</span>
+                      {isFull ? (
+                        <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black mt-0.5">ESGOTADO (0/3)</span>
+                      ) : passed ? (
+                        <span className="text-[8px] bg-slate-300 text-slate-600 px-1.5 py-0.5 rounded font-black mt-0.5">JÁ PASSOU</span>
+                      ) : (
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-black mt-0.5 ${remaining === 1 ? 'bg-amber-500 text-white animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>
+                          {remaining === 1 ? 'Última vaga!' : `${remaining} vagas`}
+                        </span>
+                      )}
                     </button>
                   );
                 })}

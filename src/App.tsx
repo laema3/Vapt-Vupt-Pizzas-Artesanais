@@ -233,6 +233,7 @@ const App: React.FC = () => {
   });
   const [cepModalInitialStep, setCepModalInitialStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>('INPUT');
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
+  const [scheduleAllowed, setScheduleAllowed] = useState(true);
 
   const handleOpeningCepVerified = (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number, schedTime?: string | null) => {
     safeStorage.setItem('nl_opening_cep_verified', 'true');
@@ -469,6 +470,7 @@ const App: React.FC = () => {
               dbService.save('settings', 'general', { storeName: 'BELLA BORDA' });
             }
             if (settings.ntfyTopic) setNtfyTopic(settings.ntfyTopic);
+            if (settings.scheduleAllowed !== undefined) setScheduleAllowed(settings.scheduleAllowed);
             if (settings.storeHours) {
               setStoreHours(settings.storeHours);
               const openNow = isStoreCurrentlyOpen(settings.storeHours);
@@ -1404,6 +1406,11 @@ const App: React.FC = () => {
             onDeleteUncoveredCep={async (id) => {
               await dbService.remove('uncovered_ceps', id);
             }}
+            scheduleAllowed={scheduleAllowed}
+            onUpdateScheduleAllowed={(allowed) => {
+              setScheduleAllowed(allowed);
+              dbService.save('settings', 'general', { scheduleAllowed: allowed });
+            }}
             onLogout={() => { 
               setShowAdminPanel(false); 
               setIsAdminAuthenticated(false);
@@ -1641,6 +1648,7 @@ const App: React.FC = () => {
           setIsOpeningCepModalOpen(true);
           setIsCartOpen(false);
         }}
+        scheduleAllowed={scheduleAllowed}
       />
       <ProductModal 
         product={selectedProduct} 

@@ -119,9 +119,11 @@ interface AdminPanelProps {
   onUpdateNtfyTopic?: (topic: string) => void;
   uncoveredCeps?: UncoveredZipLog[];
   onDeleteUncoveredCep?: (id: string) => Promise<void>;
+  scheduleAllowed?: boolean;
+  onUpdateScheduleAllowed?: (allowed: boolean) => void;
 }
 
-type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'bellabot' | 'ajustes';
+type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'horarios-agendamento' | 'bellabot' | 'ajustes';
 
 type DeleteTarget = {
   type: 'ORDER' | 'PRODUCT' | 'CATEGORY' | 'SUBCATEGORY' | 'COMPLEMENT' | 'COUPON' | 'ZIP' | 'PAYMENT' | 'TABLE';
@@ -142,7 +144,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     storeHours, onUpdateStoreHours,
     botSettings, onUpdateBotSettings,
     ntfyTopic, onUpdateNtfyTopic,
-    uncoveredCeps, onDeleteUncoveredCep
+    uncoveredCeps, onDeleteUncoveredCep,
+    scheduleAllowed = true, onUpdateScheduleAllowed
   } = props;
 
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
@@ -797,6 +800,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           <NavItem active={activeView === 'clientes'} icon="👥" label="Clientes" onClick={() => setActiveView('clientes')} />
           <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => setActiveView('pagamentos')} />
           <NavItem active={activeView === 'horarios'} icon="⏰" label="Horários" onClick={() => setActiveView('horarios')} />
+          <NavItem active={activeView === 'horarios-agendamento'} icon="📅" label="Horários de Agendamento" onClick={() => setActiveView('horarios-agendamento')} />
           <NavItem active={activeView === 'bellabot'} icon="🤖" label="BellaBot IA" onClick={() => setActiveView('bellabot')} />
           <NavItem active={activeView === 'ajustes'} icon="⚙️" label="Ajustes" onClick={() => setActiveView('ajustes')} />
         </nav>
@@ -829,7 +833,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 p-8 sm:p-10 overflow-y-auto no-scrollbar scroll-smooth">
-            {activeView === 'dashboard' && (
+             {activeView === 'dashboard' && (
                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in">
                  <div className={cardClass}>
                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Total de Pedidos</p>
@@ -847,6 +851,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Produtos Ativos</p>
                    <p className="text-4xl font-black text-purple-600 mt-2">{products.length}</p>
                  </div>
+               </div>
+            )}
+
+            {activeView === 'horarios-agendamento' && (
+               <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in">
+                  <div className="bg-white p-8 sm:p-12 rounded-[40px] border border-slate-200 shadow-sm space-y-6 text-center">
+                    <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto text-4xl font-black shadow-inner">📅</div>
+                    <div>
+                      <h2 className="text-3xl font-black uppercase tracking-tight text-slate-800">Horários de Agendamento</h2>
+                      <p className="text-slate-500 text-xs sm:text-sm mt-1 font-medium">Controle se os clientes podem realizar pedidos agendados quando a loja estiver fechada.</p>
+                    </div>
+
+                    <div className="p-8 bg-slate-50 border-2 border-slate-200 rounded-3xl flex flex-col items-center gap-6">
+                      <div className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-full border border-slate-200 shadow-sm">
+                        <span className={`w-3.5 h-3.5 rounded-full ${scheduleAllowed ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+                        <span className="font-black text-xs uppercase tracking-widest text-slate-700">Status: {scheduleAllowed ? 'Habilitado' : 'Desabilitado'}</span>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const next = !scheduleAllowed;
+                          if (onUpdateScheduleAllowed) onUpdateScheduleAllowed(next);
+                        }}
+                        className={`w-full py-6 rounded-2xl font-black uppercase text-base tracking-widest shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-3 ${
+                          scheduleAllowed 
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30' 
+                            : 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/30'
+                        }`}
+                      >
+                        <span className="text-xl">{scheduleAllowed ? '🟢' : '🔴'}</span>
+                        <span>LIBERADO PARA PEDIDOS</span>
+                      </button>
+
+                      <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                        Quando habilitado (<strong>LIBERADO PARA PEDIDOS</strong>), os clientes poderão fazer agendamentos e concluir pedidos mesmo fora do expediente (com a loja fechada). Ao desabilitar, o agendamento só é permitido com a loja aberta.
+                      </p>
+                    </div>
+                  </div>
                </div>
             )}
 

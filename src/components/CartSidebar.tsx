@@ -39,12 +39,13 @@ interface CartSidebarProps {
   ntfyTopic?: string;
   scheduledTime?: string | null;
   onOpenScheduleModal?: () => void;
+  scheduleAllowed?: boolean;
 }
 
 export const CartSidebar: React.FC<CartSidebarProps> = ({ 
   isOpen, onClose, items, coupons, onUpdateQuantity, onRemove, onCheckout, onAuthClick, 
   paymentSettings, tables, currentUser, isKioskMode, deliveryFee, availableCoupons, isStoreOpen, isProcessing,
-  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic, scheduledTime, onOpenScheduleModal
+  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic, scheduledTime, onOpenScheduleModal, scheduleAllowed = true
 }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -761,28 +762,30 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
             <button 
               onClick={() => {
-                if (!isStoreOpen && !scheduledTime && onOpenScheduleModal) {
+                if (!isStoreOpen && !scheduledTime && scheduleAllowed && onOpenScheduleModal) {
                   onOpenScheduleModal();
                   return;
                 }
                 handleCheckoutClick();
               }}
-              disabled={isProcessing || isZipOutOfArea}
+              disabled={isProcessing || isZipOutOfArea || (!isStoreOpen && !scheduledTime && !scheduleAllowed)}
               className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
-                isProcessing || isZipOutOfArea 
+                isProcessing || isZipOutOfArea || (!isStoreOpen && !scheduledTime && !scheduleAllowed)
                   ? 'bg-red-300 text-white cursor-not-allowed' 
-                  : (!isStoreOpen && !scheduledTime)
+                  : (!isStoreOpen && !scheduledTime && scheduleAllowed)
                     ? 'bg-amber-400 hover:bg-amber-500 text-slate-950 shadow-amber-400/25 cursor-pointer animate-pulse'
                     : 'bg-white text-red-600 hover:bg-red-50 shadow-red-900/20 cursor-pointer'
               }`}
             >
               {isProcessing 
                 ? 'Processando...' 
-                : (!isStoreOpen && !scheduledTime)
-                    ? '📅 Clique para Agendar Horário' 
-                    : (isZipOutOfArea 
-                        ? 'CEP Fora da Área de Entrega' 
-                        : (scheduledTime ? `Confirmar Agendamento (${scheduledTime})` : 'Confirmar Pedido'))}
+                : (!isStoreOpen && !scheduledTime && !scheduleAllowed)
+                    ? 'Agendamento Indisponível' 
+                    : (!isStoreOpen && !scheduledTime && scheduleAllowed)
+                        ? '📅 Clique para Agendar Horário' 
+                        : (isZipOutOfArea 
+                            ? 'CEP Fora da Área de Entrega' 
+                            : (scheduledTime ? `Confirmar Agendamento (${scheduledTime})` : 'Confirmar Pedido'))}
             </button>
           </div>
         )}

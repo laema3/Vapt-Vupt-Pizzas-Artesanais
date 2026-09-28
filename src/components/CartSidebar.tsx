@@ -760,20 +760,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
             <button 
               onClick={handleCheckoutClick}
-              disabled={isProcessing || !isStoreOpen || isZipOutOfArea}
+              disabled={isProcessing || (!isStoreOpen && !scheduledTime) || isZipOutOfArea}
               className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
-                isProcessing || !isStoreOpen || isZipOutOfArea 
+                isProcessing || (!isStoreOpen && !scheduledTime) || isZipOutOfArea 
                   ? 'bg-red-300 text-white cursor-not-allowed' 
                   : 'bg-white text-red-600 hover:bg-red-50 shadow-red-900/20 cursor-pointer'
               }`}
             >
               {isProcessing 
                 ? 'Processando...' 
-                : (!isStoreOpen 
+                : ((!isStoreOpen && !scheduledTime)
                     ? 'Loja Fechada' 
                     : (isZipOutOfArea 
                         ? 'CEP Fora da Área de Entrega' 
-                        : 'Confirmar Pedido'))}
+                        : (scheduledTime ? `Confirmar Agendamento (${scheduledTime})` : 'Confirmar Pedido')))}
             </button>
           </div>
         )}

@@ -1636,6 +1636,11 @@ const App: React.FC = () => {
         zipRanges={zipRanges}
         ntfyTopic={ntfyTopic}
         scheduledTime={scheduledTime}
+        onOpenScheduleModal={() => {
+          setCepModalInitialStep('SCHEDULE');
+          setIsOpeningCepModalOpen(true);
+          setIsCartOpen(false);
+        }}
       />
       <ProductModal 
         product={selectedProduct} 

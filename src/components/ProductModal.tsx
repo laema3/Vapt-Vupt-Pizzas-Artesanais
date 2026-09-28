@@ -23,6 +23,7 @@ interface ProductModalProps {
   ) => void;
   isStoreOpen: boolean;
   logoUrl: string;
+  scheduleAllowed?: boolean;
 }
 
 const NO_BORDA_COMPLEMENT: Complement = {
@@ -103,7 +104,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   onClose, 
   onAdd, 
   isStoreOpen, 
-  logoUrl 
+  logoUrl,
+  scheduleAllowed = true
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [bordaSelection, setBordaSelection] = useState<Complement | 'NONE' | null>(null);
@@ -282,7 +284,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const totalPrice = unitPrice * quantity;
 
   const canAddToCart = () => {
-    if (!isStoreOpen || product.outOfStock) return false;
+    if ((!isStoreOpen && !scheduleAllowed) || product.outOfStock) return false;
     if (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) return false;
     if (isPizza && !hasBordaDecision) return false;
     return true;
@@ -897,7 +899,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             <span>
               {product.outOfStock 
                 ? 'Produto Esgotado' 
-                : !isStoreOpen 
+                : (!isStoreOpen && !scheduleAllowed)
                 ? 'Loja Fechada'
                 : (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor)
                 ? 'Escolha o 2º Sabor para Continuar'

@@ -1659,6 +1659,7 @@ const App: React.FC = () => {
         onAdd={handleAddToCart} 
         isStoreOpen={isStoreOpen} 
         logoUrl={logoUrl} 
+        scheduleAllowed={scheduleAllowed}
       />
       <OpeningCepModal
         isOpen={isOpeningCepModalOpen}

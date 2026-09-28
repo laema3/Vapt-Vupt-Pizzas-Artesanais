@@ -462,7 +462,12 @@ const App: React.FC = () => {
             console.log("[App] Settings recebidas do subscribe:", settings);
             if (settings.isMaintenanceMode !== undefined) setIsMaintenanceMode(settings.isMaintenanceMode);
             if (settings.logoUrl) setLogoUrl(settings.logoUrl);
-            if (settings.storeName) setStoreName(settings.storeName);
+            if (settings.storeName && !settings.storeName.toUpperCase().includes('VAPIT')) {
+              setStoreName(settings.storeName);
+            } else {
+              setStoreName('BELLA BORDA');
+              dbService.save('settings', 'general', { storeName: 'BELLA BORDA' });
+            }
             if (settings.ntfyTopic) setNtfyTopic(settings.ntfyTopic);
             if (settings.storeHours) {
               setStoreHours(settings.storeHours);

@@ -15,8 +15,9 @@ interface OpeningCepModalProps {
   onLogUncoveredCep?: (cep: string) => void;
 }
 
-const BASE_SCHEDULE_HOURS = [
-  '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'
+const ALL_SCHEDULE_HOURS = [
+  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', 
+  '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
 ];
 
 export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
@@ -34,7 +35,6 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [modalStep, setModalStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>(initialStep);
   const [pendingAction, setPendingAction] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
-  const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
   const [result, setResult] = useState<{
     checked: boolean;
     isCovered: boolean;
@@ -136,9 +136,21 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
     return orders.some(o => o.scheduledTime === slot && o.status !== 'CANCELADO' && o.status !== 'FINALIZADO');
   };
 
+  const isSlotPassed = (slot: string) => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const [slotHour] = slot.split(':').map(Number);
+    return currentHour > slotHour || (currentHour === slotHour && currentMinute > 0);
+  };
+
   const handleFinalizeScheduled = (slot: string) => {
     if (isSlotReserved(slot)) {
       alert(`⚠️ Este horário (${slot}) já está reservado por outro cliente. Por favor, escolha outro horário disponível.`);
+      return;
+    }
+    if (isSlotPassed(slot)) {
+      alert(`⚠️ Este horário (${slot}) já passou. Por favor, escolha um horário disponível.`);
       return;
     }
     if (!window.confirm(`CONFIRMA ESSE HORÁRIO PARA O PEDIDO (${slot})?`)) {
@@ -149,17 +161,6 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
     } else {
       onChoosePickup(slot);
     }
-  };
-
-  // Gera horários a partir de uma hora base até 20:00 de hora em hora
-  const getSubHours = (baseHourStr: string) => {
-    const [h] = baseHourStr.split(':').map(Number);
-    const startH = h + 1;
-    const hours: string[] = [];
-    for (let current = startH; current <= 20; current++) {
-      hours.push(`${String(current).padStart(2, '0')}:00`);
-    }
-    return hours;
   };
 
   return (
@@ -348,65 +349,29 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                 ⏰ Selecione o horário de sua preferência. O pedido será entregue/preparado <strong>2 horas após</strong> o horário escolhido.
               </div>
 
-              <div className="space-y-3 max-h-[340px] overflow-y-auto p-1">
-                {BASE_SCHEDULE_HOURS.map((slot) => {
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1">
+                {ALL_SCHEDULE_HOURS.map((slot) => {
                   const reserved = isSlotReserved(slot);
-                  const isExpanded = expandedSlot === slot;
-                  const subHours = getSubHours(slot);
+                  const passed = isSlotPassed(slot);
+                  const isDisabled = reserved || passed;
+                  const deliveryHour = (Number(slot.split(':')[0]) + 2).toString().padStart(2, '0');
 
                   return (
-                    <div key={slot} className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-3.5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => handleFinalizeScheduled(slot)}
-                          disabled={reserved}
-                          className={`flex-1 text-left py-2 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-between ${
-                            reserved 
-                              ? 'bg-red-100 text-red-800 border border-red-300 cursor-not-allowed opacity-80' 
-                              : 'bg-white hover:bg-red-600 hover:text-white border border-slate-200 text-slate-900 shadow-sm cursor-pointer'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span>🕒 {slot}</span>
-                            {reserved && <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">RESERVADO</span>}
-                          </div>
-                          <span className="text-[10px] opacity-80 font-bold">Entrega {(Number(slot.split(':')[0]) + 2).toString().padStart(2, '0')}:00</span>
-                        </button>
-                      </div>
-
-                      {/* Botão Outros Horários */}
-                      <div className="pt-1">
-                        <button
-                          onClick={() => setExpandedSlot(isExpanded ? null : slot)}
-                          className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <span>{isExpanded ? '▲ Ocultar Outros Horários' : '▼ Outros Horários'}</span>
-                        </button>
-
-                        {isExpanded && subHours.length > 0 && (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-200 animate-in fade-in duration-200">
-                            {subHours.map(subSlot => {
-                              const subReserved = isSlotReserved(subSlot);
-                              return (
-                                <button
-                                  key={subSlot}
-                                  onClick={() => handleFinalizeScheduled(subSlot)}
-                                  disabled={subReserved}
-                                  className={`py-2 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex flex-col items-center gap-0.5 ${
-                                    subReserved
-                                      ? 'bg-red-100 text-red-800 border border-red-300 cursor-not-allowed'
-                                      : 'bg-white hover:bg-red-600 hover:text-white border border-slate-300 text-slate-800 shadow-xs cursor-pointer'
-                                  }`}
-                                >
-                                  <span>{subSlot}</span>
-                                  <span className="text-[8px] opacity-70">Entrega {(Number(subSlot.split(':')[0]) + 2).toString().padStart(2, '0')}:00 {subReserved ? '(Reservado)' : ''}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <button
+                      key={slot}
+                      onClick={() => handleFinalizeScheduled(slot)}
+                      disabled={isDisabled}
+                      className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${
+                        isDisabled
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
+                          : 'bg-white hover:bg-red-600 hover:text-white border-slate-200 text-slate-900 shadow-sm cursor-pointer'
+                      }`}
+                    >
+                      <span className="font-black text-sm uppercase">🕒 {slot}</span>
+                      <span className="text-[9px] font-bold opacity-80">Entrega {deliveryHour}:00</span>
+                      {reserved && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black mt-0.5">RESERVADO</span>}
+                      {passed && !reserved && <span className="text-[8px] bg-slate-300 text-slate-600 px-1.5 py-0.5 rounded font-black mt-0.5">JÁ PASSOU</span>}
+                    </button>
                   );
                 })}
               </div>

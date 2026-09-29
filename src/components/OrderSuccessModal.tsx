@@ -61,9 +61,10 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
         <div className="my-4 text-left">
           <OrderCountdownTimer
             createdAt={order.createdAt}
-            estimatedMinutes={orderMinutes}
+            estimatedMinutes={order.scheduledTime ? 120 : orderMinutes}
             status={order.status}
             orderNumber={order.orderNumber ? formatOrderNumber(order.orderNumber) : order.id.substring(0, 4)}
+            scheduledTime={order.scheduledTime}
           />
         </div>
 

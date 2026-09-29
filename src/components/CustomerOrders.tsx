@@ -110,9 +110,10 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, 
               <div className="mb-6">
                 <OrderCountdownTimer
                   createdAt={order.createdAt}
-                  estimatedMinutes={order.estimatedMinutes || defaultEstimatedMinutes || 30}
+                  estimatedMinutes={order.scheduledTime ? 120 : (order.estimatedMinutes || defaultEstimatedMinutes || 30)}
                   status={order.status}
                   orderNumber={order.orderNumber ? formatOrderNumber(order.orderNumber) : order.id.substring(0, 6)}
+                  scheduledTime={order.scheduledTime}
                 />
               </div>
 

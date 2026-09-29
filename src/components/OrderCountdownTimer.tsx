@@ -8,6 +8,7 @@ interface OrderCountdownTimerProps {
   compact?: boolean;
   orderNumber?: number | string;
   onViewOrder?: () => void;
+  scheduledTime?: string | null;
 }
 
 export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
@@ -16,7 +17,8 @@ export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
   status = 'NOVO',
   compact = false,
   orderNumber,
-  onViewOrder
+  onViewOrder,
+  scheduledTime
 }) => {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
@@ -29,7 +31,8 @@ export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
   }, []);
 
   const orderStartTime = new Date(createdAt).getTime();
-  const safeEstimatedMinutes = Math.max(1, Number(estimatedMinutes) || 30);
+  const effectiveEstimatedMinutes = scheduledTime ? 120 : (estimatedMinutes || 30);
+  const safeEstimatedMinutes = Math.max(1, Number(effectiveEstimatedMinutes));
   const totalDurationMs = safeEstimatedMinutes * 60 * 1000;
   const targetEndTime = orderStartTime + totalDurationMs;
 
@@ -86,8 +89,14 @@ export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
   // Visualização compacta (usada nos cards de lista em Meus Pedidos)
   if (compact) {
     return (
-      <div
-        className={`px-3 py-2 rounded-xl flex items-center justify-between gap-3 transition-all ${
+      <div className="space-y-1.5">
+        {scheduledTime && (
+          <div className="text-[9px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+            <span>📅</span> Agendado para as {scheduledTime} (2h)
+          </div>
+        )}
+        <div
+          className={`px-3 py-2 rounded-xl flex items-center justify-between gap-3 transition-all ${
           isFinal5Minutes
             ? 'bg-red-600 text-white border-2 border-red-400 shadow-lg shadow-red-500/50 animate-pulse ring-2 ring-red-400/60'
             : isExpired
@@ -122,6 +131,7 @@ export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
           </button>
         )}
       </div>
+      </div>
     );
   }
 
@@ -136,6 +146,13 @@ export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
           : 'bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-slate-700 shadow-xl'
       }`}
     >
+      {scheduledTime && (
+        <div className="mb-4 bg-amber-500/20 border border-amber-400/40 text-amber-200 px-4 py-2 rounded-2xl text-xs font-bold flex items-center justify-center gap-2">
+          <span className="text-base">📅</span>
+          <span>Pedido Agendado para as {scheduledTime} (Cronômetro de 2 Horas)</span>
+        </div>
+      )}
+
       {/* Indicador de Alerta de 5 minutos pulsante */}
       {isFinal5Minutes && (
         <div className="mb-3 flex items-center justify-center gap-2 bg-white/20 backdrop-blur-sm py-1.5 px-3 rounded-full border border-white/40">

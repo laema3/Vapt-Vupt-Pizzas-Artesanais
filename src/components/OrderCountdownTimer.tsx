@@ -30,15 +30,20 @@ export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  const orderStartTime = new Date(createdAt).getTime();
-  const effectiveEstimatedMinutes = scheduledTime ? 120 : (estimatedMinutes || 30);
-  const safeEstimatedMinutes = Math.max(1, Number(effectiveEstimatedMinutes));
-  const totalDurationMs = safeEstimatedMinutes * 60 * 1000;
-  const targetEndTime = orderStartTime + totalDurationMs;
+  const orderDate = new Date(createdAt);
+  const [schedH, schedM] = scheduledTime ? scheduledTime.split(':').map(Number) : [0, 0];
+  const scheduledDateTime = new Date(orderDate);
+  scheduledDateTime.setHours(schedH, schedM, 0, 0);
+  const startTime = scheduledTime ? scheduledDateTime.getTime() : new Date(createdAt).getTime();
 
+  const safeEstimatedMinutes = scheduledTime ? 120 : (estimatedMinutes || 30);
+  const totalDurationMs = safeEstimatedMinutes * 60 * 1000;
+  const targetEndTime = startTime + totalDurationMs;
+
+  const isBeforeSchedule = scheduledTime ? currentTime < startTime : false;
   const diffMs = targetEndTime - currentTime;
-  const remainingSeconds = Math.max(0, Math.floor(diffMs / 1000));
-  const elapsedMs = Math.max(0, currentTime - orderStartTime);
+  const remainingSeconds = isBeforeSchedule ? (safeEstimatedMinutes * 60) : Math.max(0, Math.floor(diffMs / 1000));
+  const elapsedMs = isBeforeSchedule ? 0 : Math.max(0, currentTime - startTime);
   const progressPercent = Math.min(100, Math.max(0, (elapsedMs / totalDurationMs) * 100));
 
   const minutes = Math.floor(remainingSeconds / 60);
@@ -91,8 +96,9 @@ export const OrderCountdownTimer: React.FC<OrderCountdownTimerProps> = ({
     return (
       <div className="space-y-1.5">
         {scheduledTime && (
-          <div className="text-[9px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-            <span>📅</span> Agendado para as {scheduledTime} (2h)
+          <div className="text-[9px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg flex items-center justify-between">
+            <span className="flex items-center gap-1.5">📅 Agendado para as {scheduledTime} (2h)</span>
+            {isBeforeSchedule && <span className="text-amber-900 bg-amber-200 px-1.5 py-0.5 rounded font-black">Aguardando Horário</span>}
           </div>
         )}
         <div

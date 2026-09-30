@@ -768,20 +768,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     : [];
 
   return (
-    <div className="flex flex-col lg:flex-row h-[100dvh] overflow-hidden bg-slate-50 text-slate-900 font-sans selection:bg-red-200 selection:text-red-900">
-      <aside className="w-full lg:w-72 max-h-[300px] lg:max-h-none bg-slate-950 flex flex-col border-r border-slate-800 shrink-0 z-30">
-        <div className="p-8 border-b border-slate-800/50 flex flex-col items-center">
-          <div className="w-24 h-24 bg-red-600 rounded-[24px] shadow-xl shadow-red-900/40 flex items-center justify-center mb-4 border-4 border-white/10 group cursor-pointer overflow-hidden relative" onClick={onBackToSite}>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-red-200 selection:text-red-900">
+      <aside className="w-full lg:w-72 bg-slate-950 flex flex-col border-r border-slate-800 shrink-0 z-30">
+        <div className="p-6 sm:p-8 border-b border-slate-800/50 flex flex-col items-center">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 bg-red-600 rounded-[24px] shadow-xl shadow-red-900/40 flex items-center justify-center mb-4 border-4 border-white/10 group cursor-pointer overflow-hidden relative" onClick={onBackToSite}>
              {logoUrl ? <img src={logoUrl} className="w-full h-full object-cover" alt="Logo" referrerPolicy="no-referrer" /> : <span className="text-5xl">🏪</span>}
           </div>
-          <h2 className="text-2xl font-black text-white uppercase tracking-tighter">DELIVERY <span className="text-red-500">ADMIN</span></h2>
+          <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tighter">DELIVERY <span className="text-red-500">ADMIN</span></h2>
           <div className="flex items-center gap-2 mt-2">
             <div className={`w-3 h-3 rounded-full ${isStoreOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{isStoreOpen ? 'Loja Aberta' : 'Loja Fechada'}</span>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 p-3 sm:p-4 space-y-1 overflow-y-auto no-scrollbar">
           <NavItem active={activeView === 'dashboard'} icon="📊" label="Dashboard" onClick={() => setActiveView('dashboard')} />
           <NavItem active={activeView === 'pedidos'} icon="🛍️" label="Pedidos" onClick={() => setActiveView('pedidos')} badge={activeOrdersCount > 0 ? activeOrdersCount : undefined} />
           
@@ -813,21 +813,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative h-full overflow-hidden">
-        <header className="h-24 bg-slate-950 border-b border-slate-800 px-8 flex items-center justify-between shrink-0 z-20 shadow-md shadow-slate-900/50">
-           <div className="flex items-center gap-6">
-              <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative min-h-screen">
+        <header className="min-h-20 lg:h-24 bg-slate-950 border-b border-slate-800 px-4 sm:px-8 py-4 lg:py-0 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 z-20 shadow-md shadow-slate-900/50">
+           <div className="flex items-center gap-4">
+              <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
                 <span className="p-2.5 bg-slate-800 text-slate-200 rounded-xl text-xl border border-slate-700 shadow-sm">
                   {activeView === 'dashboard' ? '📊' : activeView === 'pedidos' ? '🛍️' : activeView === 'precificacao' ? '🍕' : activeView === 'sugestoes' ? '📅' : activeView === 'bellabot' ? '🤖' : '⚙️'}
                 </span>
                 {activeView === 'sugestoes' ? 'Pizza da Semana (WhatsApp & Instagram)' : activeView === 'bellabot' ? 'BellaBot IA (Atendimento & Vendas)' : activeView}
               </h1>
            </div>
-           <div className="flex items-center gap-4">
-             <button onClick={onWaiterMode || onBackToSite} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2">
+           <div className="flex items-center gap-3">
+             <button onClick={onWaiterMode || onBackToSite} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2">
                <span>🤵</span> Atendimento Mesa
              </button>
-             <button onClick={onBackToSite} className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-900/20">Ver Site</button>
+             <button onClick={onBackToSite} className="bg-red-600 hover:bg-red-500 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-900/20">Ver Site</button>
            </div>
         </header>
 

@@ -34,6 +34,8 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   onLogUncoveredCep
 }) => {
   const [cepInput, setCepInput] = useState('');
+  const [customTimeInput, setCustomTimeInput] = useState('');
+  const [confirmingSlot, setConfirmingSlot] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [modalStep, setModalStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>(initialStep);
   const [pendingAction, setPendingAction] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
@@ -164,14 +166,36 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
       alert(`⚠️ Este horário (${slot}) já passou. Por favor, escolha um horário disponível.`);
       return;
     }
-    if (!window.confirm(`CONFIRMA ESSE HORÁRIO PARA O PEDIDO (${slot})?`)) {
+    setConfirmingSlot(slot);
+  };
+
+  const handleCustomTimeSubmit = () => {
+    const clean = customTimeInput.trim();
+    const parts = clean.split(':').map(Number);
+    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+      alert('Por favor, digite um horário válido no formato HH:MM (ex: 17:15).');
       return;
     }
-    if (pendingAction === 'DELIVERY') {
-      onVerifySuccess(cepInput, result.addressInfo || {}, result.fee, slot);
-    } else {
-      onChoosePickup(slot);
+    const [h, m] = parts;
+    if (h < 8 || h > 20 || m < 0 || m > 59) {
+      alert('O horário deve ser entre 08:00 e 20:00.');
+      return;
     }
+
+    const targetMinutes = h * 60 + m;
+    let closestSlot = ALL_SCHEDULE_HOURS[0];
+    let minDiff = Infinity;
+    for (const slot of ALL_SCHEDULE_HOURS) {
+      const [sh, sm] = slot.split(':').map(Number);
+      const slotMinutes = sh * 60 + sm;
+      const diff = Math.abs(slotMinutes - targetMinutes);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestSlot = slot;
+      }
+    }
+
+    handleFinalizeScheduled(closestSlot);
   };
 
   return (
@@ -356,8 +380,73 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
 
           {modalStep === 'SCHEDULE' && (
             <div className="space-y-4 animate-in fade-in duration-300">
+              {confirmingSlot ? (
+                <div className="bg-red-50 border-2 border-red-500 p-6 rounded-3xl text-center space-y-6 shadow-xl">
+                  <div className="w-16 h-16 bg-red-600 text-white rounded-2xl flex items-center justify-center mx-auto text-3xl font-black shadow-lg">
+                    📅
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                      Confirmar Horário Agendado?
+                    </h3>
+                    <p className="text-red-700 text-2xl font-black mt-2">
+                      {confirmingSlot} (Entrega às {getDeliveryTime(confirmingSlot)})
+                    </p>
+                    <p className="text-slate-600 text-xs font-medium mt-2">
+                      Deseja confirmar este horário para o seu pedido?
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => {
+                        const slot = confirmingSlot;
+                        setConfirmingSlot(null);
+                        if (pendingAction === 'DELIVERY') {
+                          onVerifySuccess(cepInput, result.addressInfo || {}, result.fee, slot);
+                        } else {
+                          onChoosePickup(slot);
+                        }
+                      }}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 px-6 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-red-600/30 active:scale-95 transition-all cursor-pointer"
+                    >
+                      ✓ Sim, Confirmar Horário
+                    </button>
+                    <button
+                      onClick={() => setConfirmingSlot(null)}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 py-4 px-6 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer"
+                    >
+                      Escolher Outro
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
               <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl text-amber-900 text-xs font-bold">
                 ⏰ Selecione o horário de sua preferência. O pedido será entregue/preparado <strong>2 horas após</strong> o horário escolhido.
+              </div>
+
+              <div className="bg-white border-2 border-slate-200 p-3.5 rounded-2xl space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-700 block">
+                  Ou digite o horário desejado (Ex: 17:15):
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="HH:MM"
+                    maxLength={5}
+                    value={customTimeInput}
+                    onChange={(e) => setCustomTimeInput(e.target.value)}
+                    className="bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 w-32 text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCustomTimeSubmit}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Agendar Horário Digitado
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1">
@@ -402,6 +491,8 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
               >
                 ← Voltar
               </button>
+              </>
+              )}
             </div>
           )}
         </div>

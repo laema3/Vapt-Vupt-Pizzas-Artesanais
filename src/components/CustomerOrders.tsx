@@ -20,13 +20,26 @@ interface CustomerOrdersProps {
   orders: Order[];
   onBack: () => void;
   onReorder: (order: Order) => void;
+  onUpdateOrder?: (id: string, updates: Partial<Order>) => void;
   defaultEstimatedMinutes?: number;
   storeName?: string;
   socialLinks?: any;
 }
 
-export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, onReorder, defaultEstimatedMinutes = 30, storeName, socialLinks }) => {
+export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, onReorder, onUpdateOrder, defaultEstimatedMinutes = 30, storeName, socialLinks }) => {
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+  const [reschedulingOrderId, setReschedulingOrderId] = useState<string | null>(null);
+  const [rescheduleNewTime, setRescheduleNewTime] = useState('');
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+
+  const isScheduledBeforeTime = (order: Order) => {
+    if (!order.scheduledTime || order.status === 'CANCELADO' || order.status === 'FINALIZADO') return false;
+    const orderDate = new Date(order.createdAt);
+    const [sh, sm] = order.scheduledTime.split(':').map(Number);
+    const schedDate = new Date(orderDate);
+    schedDate.setHours(sh, sm, 0, 0);
+    return Date.now() < schedDate.getTime();
+  };
 
   useEffect(() => {
     if (trackingOrder) {
@@ -127,6 +140,84 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, 
               </div>
 
               <div className="flex flex-wrap justify-end gap-3">
+                {reschedulingOrderId === order.id ? (
+                  <div className="w-full bg-amber-50 border-2 border-amber-300 p-4 rounded-2xl space-y-3">
+                    <p className="text-xs font-black uppercase text-amber-900">Remarcar Horário (Atual: {order.scheduledTime})</p>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="HH:MM (ex: 18:30)" 
+                        maxLength={5}
+                        value={rescheduleNewTime}
+                        onChange={e => setRescheduleNewTime(e.target.value)}
+                        className="bg-white border-2 border-amber-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 w-36 text-center"
+                      />
+                      <button 
+                        onClick={() => {
+                          const clean = rescheduleNewTime.trim();
+                          if (clean.length === 5 && clean.includes(':')) {
+                            onUpdateOrder?.(order.id, { scheduledTime: clean });
+                            setReschedulingOrderId(null);
+                            alert(`Horário remarcado com sucesso para as ${clean}!`);
+                          } else {
+                            alert('Formato inválido. Use HH:MM (ex: 18:30).');
+                          }
+                        }}
+                        className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-black uppercase text-xs cursor-pointer"
+                      >
+                        Salvar Novo Horário
+                      </button>
+                      <button 
+                        onClick={() => setReschedulingOrderId(null)}
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-xl font-bold text-xs cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : cancellingOrderId === order.id ? (
+                  <div className="w-full bg-red-50 border-2 border-red-300 p-4 rounded-2xl space-y-3">
+                    <p className="text-xs font-black uppercase text-red-900">Tem certeza que deseja cancelar este pedido agendado?</p>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          onUpdateOrder?.(order.id, { status: 'CANCELADO' });
+                          setCancellingOrderId(null);
+                          alert('Pedido agendado cancelado com sucesso.');
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-black uppercase text-xs cursor-pointer"
+                      >
+                        Sim, Cancelar Pedido
+                      </button>
+                      <button 
+                        onClick={() => setCancellingOrderId(null)}
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-xl font-bold text-xs cursor-pointer"
+                      >
+                        Voltar
+                      </button>
+                    </div>
+                  </div>
+                ) : isScheduledBeforeTime(order) && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setReschedulingOrderId(order.id);
+                        setRescheduleNewTime(order.scheduledTime || '');
+                      }}
+                      className="bg-amber-500 text-white px-4 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-amber-600 transition-colors shadow-md active:scale-95 cursor-pointer"
+                    >
+                      Remarcar Horário 🕒
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setCancellingOrderId(order.id);
+                      }}
+                      className="bg-red-50 text-red-600 border border-red-200 px-4 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-red-100 transition-colors active:scale-95 cursor-pointer"
+                    >
+                      Cancelar Pedido ✕
+                    </button>
+                  </>
+                )}
                 <button onClick={() => printOrderReceipt(order, storeName, socialLinks)} className="bg-slate-100 text-slate-700 border border-slate-200 px-4 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-colors flex items-center gap-1.5 active:scale-95" title="Imprimir Cupom">
                   <span>Imprimir Cupom</span>
                   <span>🖨️</span>

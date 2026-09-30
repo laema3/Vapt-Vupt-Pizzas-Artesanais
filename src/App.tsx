@@ -1477,7 +1477,15 @@ const App: React.FC = () => {
                 <CustomerOrders 
                   orders={myOrders} 
                   onBack={() => setActiveView('home')} 
-                  onReorder={() => {}} 
+                  onReorder={(order) => {
+                    if (order && order.items && order.items.length > 0) {
+                      setCart(order.items.map(item => ({ ...item })));
+                      setIsCartOpen(true);
+                      setActiveView('home');
+                      setToast({ show: true, msg: 'Itens do pedido adicionados ao carrinho!', type: 'success' });
+                    }
+                  }} 
+                  onUpdateOrder={(id, updates) => dbService.save('orders', id, updates)}
                   defaultEstimatedMinutes={socialLinks.orderEstimatedMinutes || 30}
                   storeName={storeName}
                   socialLinks={socialLinks}

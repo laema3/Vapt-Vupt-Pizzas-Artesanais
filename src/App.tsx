@@ -1214,6 +1214,7 @@ const App: React.FC = () => {
         
         setLastOrder(newOrder);
         setIsSuccessModalOpen(true);
+        setIsOrderProcessing(false);
         setCart([]);
         if(isKioskMode) setTimeout(() => setKioskStarted(false), 5000); 
     } catch (e) {

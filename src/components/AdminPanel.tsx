@@ -932,7 +932,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                       .filter(o => (activeOrderTab === 'TODOS' || o.status === activeOrderTab) && !deletedIds.includes(o.id))
                       .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                       .map(order => (
-                        <div key={order.id} onClick={() => setSelectedOrderId(selectedOrderId === order.id ? null : order.id)} className={`rounded-3xl overflow-hidden transition-all shadow-sm flex flex-col md:flex-row cursor-pointer border-2 ${selectedOrderId === order.id ? 'bg-red-50 border-red-500 ring-4 ring-red-100 scale-[1.01] shadow-xl' : 'bg-white border-slate-200 hover:border-red-200 hover:shadow-lg'} ${order.status === 'NOVO' && selectedOrderId !== order.id ? 'border-l-8 border-l-blue-500' : ''}`}>
+                        <div key={order.id} onClick={() => setSelectedOrderId(selectedOrderId === order.id ? null : order.id)} className={`rounded-3xl overflow-hidden transition-all shadow-sm flex flex-col cursor-pointer border-2 ${selectedOrderId === order.id ? 'bg-red-50 border-red-500 ring-4 ring-red-100 scale-[1.01] shadow-xl' : 'bg-white border-slate-200 hover:border-red-200 hover:shadow-lg'} ${order.status === 'NOVO' && selectedOrderId !== order.id ? 'border-l-8 border-l-blue-500' : ''}`}>
                           <div className="flex-1 p-8 flex flex-col justify-between">
                             <div className="space-y-4">
                                <div className="flex flex-wrap items-center gap-3">

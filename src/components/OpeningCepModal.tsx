@@ -35,6 +35,7 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
 }) => {
   const [cepInput, setCepInput] = useState('');
   const [customTimeInput, setCustomTimeInput] = useState('');
+  const [customTimeError, setCustomTimeError] = useState('');
   const [confirmingSlot, setConfirmingSlot] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [modalStep, setModalStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>(initialStep);
@@ -158,8 +159,8 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
 
   const handleFinalizeScheduled = (slot: string) => {
     const count = getSlotReservedCount(slot);
-    if (count >= 3) {
-      alert(`⚠️ Este horário (${slot}) já atingiu a capacidade máxima de 3 pedidos. Por favor, escolha outro horário disponível.`);
+    if (count >= 4) {
+      alert(`⚠️ Este horário (${slot}) já atingiu a capacidade máxima de 4 pedidos. Por favor, escolha outro horário disponível.`);
       return;
     }
     if (isSlotPassed(slot)) {
@@ -170,17 +171,23 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   };
 
   const handleCustomTimeSubmit = () => {
-    const clean = customTimeInput.trim();
+    let clean = customTimeInput.trim().replace(/\s+/g, '');
+    if (/^\d{4}$/.test(clean)) {
+      clean = clean.slice(0, 2) + ':' + clean.slice(2);
+    }
+    clean = clean.replace('.', ':').replace('h', ':');
+
     const parts = clean.split(':').map(Number);
     if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
-      alert('Por favor, digite um horário válido no formato HH:MM (ex: 17:15).');
+      setCustomTimeError('Por favor, digite um horário válido no formato HH:MM (ex: 17:15).');
       return;
     }
     const [h, m] = parts;
     if (h < 8 || h > 20 || m < 0 || m > 59) {
-      alert('O horário deve ser entre 08:00 e 20:00.');
+      setCustomTimeError('O horário deve ser entre 08:00 e 20:00.');
       return;
     }
+    setCustomTimeError('');
 
     const targetMinutes = h * 60 + m;
     let closestSlot = ALL_SCHEDULE_HOURS[0];
@@ -447,12 +454,15 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                     Agendar Horário Digitado
                   </button>
                 </div>
+                {customTimeError && (
+                  <p className="text-red-600 text-[11px] font-black mt-1">⚠️ {customTimeError}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1">
                 {ALL_SCHEDULE_HOURS.map((slot) => {
                   const count = getSlotReservedCount(slot);
-                  const remaining = 3 - count;
+                  const remaining = 4 - count;
                   const isFull = remaining <= 0;
                   const passed = isSlotPassed(slot);
                   const isDisabled = isFull || passed;
@@ -472,11 +482,11 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                       <span className="font-black text-sm uppercase">🕒 {slot}</span>
                       <span className="text-[9px] font-bold opacity-80 group-hover:text-red-100">Entrega {deliveryTimeStr}</span>
                       {isFull ? (
-                        <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black mt-0.5">ESGOTADO (0/3)</span>
+                        <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black mt-0.5">ESGOTADO (0/4)</span>
                       ) : passed ? (
                         <span className="text-[8px] bg-slate-300 text-slate-600 px-1.5 py-0.5 rounded font-black mt-0.5">JÁ PASSOU</span>
                       ) : (
-                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-black mt-0.5 ${remaining === 1 ? 'bg-amber-500 text-white animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-black mt-0.5 ${count > 0 ? 'bg-amber-400 text-amber-950 font-black' : remaining === 1 ? 'bg-amber-500 text-white animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>
                           {remaining === 1 ? 'Última vaga!' : `${remaining} vagas`}
                         </span>
                       )}

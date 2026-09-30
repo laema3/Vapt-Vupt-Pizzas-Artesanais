@@ -31,7 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm relative">
+    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 sm:h-28">
           
@@ -66,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
 
-          <div className="flex items-center gap-3 sm:gap-6">
+          <div className="flex items-center gap-3 sm:gap-4">
             {isWaiter && !isAdmin && (
               <button 
                 onClick={onBackToTables}
@@ -76,63 +76,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Desktop Navigation */}
-            {!isAdmin && !isKioskMode && !isWaiter && (
-              <>
-                <button 
-                  onClick={onMyOrdersClick}
-                  className="hidden md:flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-900/20 active:scale-95"
-                >
-                  📋 Meus Pedidos
-                </button>
-
-                {onConsultCepClick && (
-                  <button 
-                    onClick={onConsultCepClick}
-                    className="hidden md:flex items-center gap-1 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
-                    title="Consultar disponibilidade de entrega por CEP"
-                  >
-                    <span>📍</span>
-                    <span>Consultar CEP</span>
-                  </button>
-                )}
-
-                {onConsultScheduleClick && (
-                  <button 
-                    onClick={onConsultScheduleClick}
-                    className="hidden md:flex items-center gap-1 bg-rose-100 hover:bg-rose-200 text-rose-900 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
-                    title="Consultar horários de agendamento"
-                  >
-                    <span>📅</span>
-                    <span>Consultar Agendamento</span>
-                  </button>
-                )}
-
-                <button 
-                  onClick={onToggleAdmin} 
-                  className="hidden md:flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors" 
-                  title="Área Administrativa"
-                >
-                  ⚙️
-                </button>
-                
-                {currentUser ? (
-                  <div className="hidden md:flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
-                    <div className="text-right">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-red-600" onClick={onProfileClick}>Olá, {currentUser.name.split(' ')[0]}</p>
-                    </div>
-                    <button onClick={onLogout} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Sair">🚪</button>
-                  </div>
-                ) : (
-                  <button onClick={onAuthClick} className="hidden md:flex items-center gap-2 text-xs font-black text-slate-600 hover:text-red-600 uppercase tracking-widest transition-colors">
-                    <span>👤</span> Entrar
-                  </button>
-                )}
-              </>
-            )}
-
             {!isAdmin && (
-              <button onClick={onCartClick} className="relative group">
+              <button onClick={onCartClick} className="relative group cursor-pointer">
                 <div className="w-12 h-12 bg-red-600 text-white rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-red-900/20 group-hover:scale-105 group-active:scale-95 transition-all">
                   🛒
                 </div>
@@ -150,11 +95,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Mobile Hamburger Button */}
+            {/* Hamburger Menu Button (Always available) */}
             {!isAdmin && !isWaiter && (
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 flex items-center justify-center text-xl font-black shadow-sm transition-all active:scale-95 cursor-pointer"
+                className="w-12 h-12 rounded-2xl bg-red-600 hover:bg-red-700 text-white flex items-center justify-center text-2xl font-black shadow-lg shadow-red-900/20 transition-all active:scale-95 cursor-pointer"
                 title="Menu"
               >
                 {isMobileMenuOpen ? '✕' : '☰'}
@@ -164,9 +109,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Mobile Hamburger Menu Drawer */}
+      {/* Hamburger Menu Drawer */}
       {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-slate-200 shadow-2xl py-6 px-6 space-y-4 animate-in slide-in-from-top duration-200 z-50">
+        <div className="absolute top-full left-0 w-full bg-white border-b border-slate-200 shadow-2xl py-6 px-6 space-y-4 animate-in slide-in-from-top duration-200 z-50">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-200">
@@ -177,14 +122,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <p className="text-[10px] font-bold text-slate-400 uppercase">{isStoreOpen ? 'Aberto Agora' : 'Fechado'}</p>
               </div>
             </div>
-            <button onClick={() => setIsMobileMenuOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold">✕</button>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold cursor-pointer">✕</button>
           </div>
 
           <div className="grid grid-cols-1 gap-2.5">
             {onConsultCepClick && (
               <button 
                 onClick={() => { setIsMobileMenuOpen(false); onConsultCepClick(); }}
-                className="w-full text-left px-4 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-black uppercase text-xs tracking-wider flex items-center gap-3 border border-amber-200 transition-all cursor-pointer"
+                className="w-full text-left px-4 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-black uppercase text-xs tracking-wider flex items-center gap-3 border border-amber-200 transition-all cursor-pointer shadow-sm"
               >
                 <span className="text-lg">📍</span> Consultar CEP de Entrega
               </button>
@@ -193,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {onConsultScheduleClick && (
               <button 
                 onClick={() => { setIsMobileMenuOpen(false); onConsultScheduleClick(); }}
-                className="w-full text-left px-4 py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-xl font-black uppercase text-xs tracking-wider flex items-center gap-3 border border-rose-200 transition-all cursor-pointer"
+                className="w-full text-left px-4 py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-xl font-black uppercase text-xs tracking-wider flex items-center gap-3 border border-rose-200 transition-all cursor-pointer shadow-sm"
               >
                 <span className="text-lg">📅</span> Consultar / Agendar Horário
               </button>
@@ -201,17 +146,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button 
               onClick={() => { setIsMobileMenuOpen(false); onMyOrdersClick(); }}
-              className="w-full text-left px-4 py-3.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-black uppercase text-xs tracking-wider flex items-center gap-3 border border-red-200 transition-all cursor-pointer"
+              className="w-full text-left px-4 py-3.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-black uppercase text-xs tracking-wider flex items-center gap-3 border border-red-200 transition-all cursor-pointer shadow-sm"
             >
               <span className="text-lg">📋</span> Meus Pedidos & Acompanhamento
             </button>
 
-            <button 
-              onClick={() => { setIsMobileMenuOpen(false); onToggleAdmin(); }}
-              className="w-full text-left px-4 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-black uppercase text-xs tracking-wider flex items-center gap-3 border border-slate-200 transition-all cursor-pointer"
-            >
-              <span className="text-lg">⚙️</span> Painel Administrativo
-            </button>
+
 
             {currentUser ? (
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">

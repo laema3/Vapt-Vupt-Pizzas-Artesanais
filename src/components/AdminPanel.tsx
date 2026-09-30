@@ -149,7 +149,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   } = props;
 
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
-  const [activeOrderTab, setActiveOrderTab] = useState<OrderStatus | 'TODOS'>('NOVO');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeOrderTab, setActiveOrderTab] = useState<OrderStatus | 'TODOS'>('TODOS');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -767,9 +768,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     ? subCategories.filter(s => s.categoryId === currentCategoryObj.id)
     : [];
 
+  const handleNavClick = (view: AdminView) => {
+    setActiveView(view);
+    setIsSidebarOpen(false);
+  };
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-red-200 selection:text-red-900">
-      <aside className="w-full lg:w-72 bg-slate-950 flex flex-col border-r border-slate-800 shrink-0 z-30">
+      <aside className={`w-full lg:w-72 bg-slate-950 flex-col border-r border-slate-800 shrink-0 z-30 ${isSidebarOpen ? 'fixed inset-x-0 top-20 bottom-0 z-50 flex shadow-2xl' : 'hidden lg:flex'}`}>
         <div className="p-6 sm:p-8 border-b border-slate-800/50 flex flex-col items-center">
           <div className="w-20 h-20 sm:w-24 sm:h-24 bg-red-600 rounded-[24px] shadow-xl shadow-red-900/40 flex items-center justify-center mb-4 border-4 border-white/10 group cursor-pointer overflow-hidden relative" onClick={onBackToSite}>
              {logoUrl ? <img src={logoUrl} className="w-full h-full object-cover" alt="Logo" referrerPolicy="no-referrer" /> : <span className="text-5xl">🏪</span>}
@@ -782,31 +788,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
         </div>
 
         <nav className="flex-1 p-3 sm:p-4 space-y-1 overflow-y-auto no-scrollbar">
-          <NavItem active={activeView === 'dashboard'} icon="📊" label="Dashboard" onClick={() => setActiveView('dashboard')} />
-          <NavItem active={activeView === 'pedidos'} icon="🛍️" label="Pedidos" onClick={() => setActiveView('pedidos')} badge={activeOrdersCount > 0 ? activeOrdersCount : undefined} />
+          <NavItem active={activeView === 'dashboard'} icon="📊" label="Dashboard" onClick={() => handleNavClick('dashboard')} />
+          <NavItem active={activeView === 'pedidos'} icon="🛍️" label="Pedidos" onClick={() => handleNavClick('pedidos')} badge={activeOrdersCount > 0 ? activeOrdersCount : undefined} />
           
           <div className="pt-6 pb-2 px-4 text-xs font-black text-slate-600 uppercase tracking-widest">Cardápio</div>
-          <NavItem active={activeView === 'produtos'} icon="🍔" label="Produtos" onClick={() => setActiveView('produtos')} />
-          <NavItem active={activeView === 'categorias'} icon="📁" label="Categorias" onClick={() => setActiveView('categorias')} />
-          <NavItem active={activeView === 'subcategorias'} icon="🌿" label="Subcategorias" onClick={() => setActiveView('subcategorias')} />
-          <NavItem active={activeView === 'bordas'} icon="🥖" label="Bordas" onClick={() => setActiveView('bordas')} />
-          <NavItem active={activeView === 'adicionais'} icon="➕" label="Adicionais" onClick={() => setActiveView('adicionais')} />
+          <NavItem active={activeView === 'produtos'} icon="🍔" label="Produtos" onClick={() => handleNavClick('produtos')} />
+          <NavItem active={activeView === 'categorias'} icon="📁" label="Categorias" onClick={() => handleNavClick('categorias')} />
+          <NavItem active={activeView === 'subcategorias'} icon="🌿" label="Subcategorias" onClick={() => handleNavClick('subcategorias')} />
+          <NavItem active={activeView === 'bordas'} icon="🥖" label="Bordas" onClick={() => handleNavClick('bordas')} />
+          <NavItem active={activeView === 'adicionais'} icon="➕" label="Adicionais" onClick={() => handleNavClick('adicionais')} />
           
           <div className="pt-6 pb-2 px-4 text-xs font-black text-slate-600 uppercase tracking-widest">Gestão</div>
-          <NavItem active={activeView === 'cupons'} icon="🏷️" label="Cupons" onClick={() => setActiveView('cupons')} />
-          <NavItem active={activeView === 'precificacao'} icon="🍕" label="Precificação" onClick={() => setActiveView('precificacao')} />
-          <NavItem active={activeView === 'sugestoes'} icon="📅" label="Pizza da Semana" onClick={() => setActiveView('sugestoes')} />
-          <NavItem active={activeView === 'entregas'} icon="🚚" label="Taxas Frete" onClick={() => setActiveView('entregas')} />
-          <NavItem active={activeView === 'clientes'} icon="👥" label="Clientes" onClick={() => setActiveView('clientes')} />
-          <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => setActiveView('pagamentos')} />
-          <NavItem active={activeView === 'horarios'} icon="⏰" label="Horários" onClick={() => setActiveView('horarios')} />
-          <NavItem active={activeView === 'horarios-agendamento'} icon="📅" label="Horários de Agendamento" onClick={() => setActiveView('horarios-agendamento')} />
-          <NavItem active={activeView === 'bellabot'} icon="🤖" label="BellaBot IA" onClick={() => setActiveView('bellabot')} />
-          <NavItem active={activeView === 'ajustes'} icon="⚙️" label="Ajustes" onClick={() => setActiveView('ajustes')} />
+          <NavItem active={activeView === 'cupons'} icon="🏷️" label="Cupons" onClick={() => handleNavClick('cupons')} />
+          <NavItem active={activeView === 'precificacao'} icon="🍕" label="Precificação" onClick={() => handleNavClick('precificacao')} />
+          <NavItem active={activeView === 'sugestoes'} icon="📅" label="Pizza da Semana" onClick={() => handleNavClick('sugestoes')} />
+          <NavItem active={activeView === 'entregas'} icon="🚚" label="Taxas Frete" onClick={() => handleNavClick('entregas')} />
+          <NavItem active={activeView === 'clientes'} icon="👥" label="Clientes" onClick={() => handleNavClick('clientes')} />
+          <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => handleNavClick('pagamentos')} />
+          <NavItem active={activeView === 'horarios'} icon="⏰" label="Horários" onClick={() => handleNavClick('horarios')} />
+          <NavItem active={activeView === 'horarios-agendamento'} icon="📅" label="Horários de Agendamento" onClick={() => handleNavClick('horarios-agendamento')} />
+          <NavItem active={activeView === 'bellabot'} icon="🤖" label="BellaBot IA" onClick={() => handleNavClick('bellabot')} />
+          <NavItem active={activeView === 'ajustes'} icon="⚙️" label="Ajustes" onClick={() => handleNavClick('ajustes')} />
         </nav>
 
         <div className="p-4 border-t border-slate-800/50 bg-slate-950/50">
-           <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl text-red-400 hover:bg-red-500/10 transition-all font-black uppercase text-xs tracking-widest">
+           <button onClick={() => { setIsSidebarOpen(false); onLogout(); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl text-red-400 hover:bg-red-500/10 transition-all font-black uppercase text-xs tracking-widest">
              🚪 <span>Sair do Painel</span>
            </button>
            <div className="mt-2 text-center text-[10px] font-bold text-slate-600 uppercase">{APP_VERSION}</div>
@@ -815,12 +821,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
       <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative min-h-screen">
         <header className="min-h-20 lg:h-24 bg-slate-950 border-b border-slate-800 px-4 sm:px-8 py-4 lg:py-0 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 z-20 shadow-md shadow-slate-900/50">
-           <div className="flex items-center gap-4">
-              <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
-                <span className="p-2.5 bg-slate-800 text-slate-200 rounded-xl text-xl border border-slate-700 shadow-sm">
+           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
+              <button 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+                className="lg:hidden w-12 h-12 bg-slate-800 hover:bg-slate-700 text-white rounded-xl flex items-center justify-center text-2xl font-black shadow-md border border-slate-700 transition-all cursor-pointer shrink-0"
+                title="Menu Admin"
+              >
+                {isSidebarOpen ? '✕' : '☰'}
+              </button>
+              <h1 className="text-lg sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2 sm:gap-3 truncate">
+                <span className="p-2.5 bg-slate-800 text-slate-200 rounded-xl text-xl border border-slate-700 shadow-sm shrink-0">
                   {activeView === 'dashboard' ? '📊' : activeView === 'pedidos' ? '🛍️' : activeView === 'precificacao' ? '🍕' : activeView === 'sugestoes' ? '📅' : activeView === 'bellabot' ? '🤖' : '⚙️'}
                 </span>
-                {activeView === 'sugestoes' ? 'Pizza da Semana (WhatsApp & Instagram)' : activeView === 'bellabot' ? 'BellaBot IA (Atendimento & Vendas)' : activeView}
+                <span className="truncate">{activeView === 'sugestoes' ? 'Pizza da Semana' : activeView === 'bellabot' ? 'BellaBot IA' : activeView}</span>
               </h1>
            </div>
            <div className="flex items-center gap-3">
@@ -893,7 +906,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
             )}
 
             {activeView === 'pedidos' && (
-              <div className="animate-in fade-in duration-500">
+              <div className="animate-in fade-in duration-500 space-y-6">
+                 {/* Filtro de Status Responsivo para Mobile / Todas as Telas */}
+                 <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                   {ORDER_STATUSES.map(status => {
+                     const count = status === 'TODOS' ? orders.filter(o => !deletedIds.includes(o.id)).length : orders.filter(o => o.status === status && !deletedIds.includes(o.id)).length;
+                     return (
+                       <button
+                         key={status}
+                         onClick={() => setActiveOrderTab(status)}
+                         className={`px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border shrink-0 cursor-pointer ${
+                           activeOrderTab === status 
+                             ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-200' 
+                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                         }`}
+                       >
+                         {status} ({count})
+                       </button>
+                     );
+                   })}
+                 </div>
+
                  <div className="grid grid-cols-1 gap-8 w-full max-w-4xl mr-auto">
                     {orders
                       .filter(o => (activeOrderTab === 'TODOS' || o.status === activeOrderTab) && !deletedIds.includes(o.id))

@@ -775,7 +775,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-red-200 selection:text-red-900">
-      <aside className={`w-full lg:w-72 bg-slate-950 flex-col border-r border-slate-800 shrink-0 z-30 ${isSidebarOpen ? 'fixed inset-x-0 top-20 bottom-0 z-50 flex shadow-2xl' : 'hidden lg:flex'}`}>
+      <aside className={`w-full lg:w-72 bg-slate-950 flex-col border-r border-slate-800 shrink-0 z-30 ${isSidebarOpen ? 'fixed inset-y-0 left-0 w-72 z-50 flex shadow-2xl' : 'hidden lg:flex'}`}>
         <div className="p-6 sm:p-8 border-b border-slate-800/50 flex flex-col items-center">
           <div className="w-20 h-20 sm:w-24 sm:h-24 bg-red-600 rounded-[24px] shadow-xl shadow-red-900/40 flex items-center justify-center mb-4 border-4 border-white/10 group cursor-pointer overflow-hidden relative" onClick={onBackToSite}>
              {logoUrl ? <img src={logoUrl} className="w-full h-full object-cover" alt="Logo" referrerPolicy="no-referrer" /> : <span className="text-5xl">🏪</span>}
@@ -820,7 +820,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative min-h-screen">
-        <header className="min-h-20 lg:h-24 bg-slate-950 border-b border-slate-800 px-4 sm:px-8 py-4 lg:py-0 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 z-20 shadow-md shadow-slate-900/50">
+        <header className="sticky top-0 z-40 min-h-20 lg:h-24 bg-slate-950 border-b border-slate-800 px-4 sm:px-8 py-4 lg:py-0 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 shadow-md shadow-slate-900/50">
            <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
               <button 
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
@@ -1032,7 +1032,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                               </div>
                             </div>
                           </div>
-                          <div className="w-full md:w-16 bg-slate-50 border-l border-slate-200 flex flex-col items-center justify-center gap-4 py-4">
+                          <div className="w-full bg-slate-50 border-t md:border-t-0 md:border-l border-slate-200 flex flex-row items-center justify-center gap-4 p-4">
                              <button onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/${order.customerPhone.replace(/\D/g,'')}`, '_blank'); }} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-red-50 text-red-600 shadow-sm" title="WhatsApp">📞</button>
                              <button onClick={(e) => { e.stopPropagation(); handlePrintOrder(order); }} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 shadow-sm" title="Imprimir Cupom">🖨️</button>
                              <button onClick={(e) => { e.stopPropagation(); requestDelete('ORDER', order.id, `Pedido #${order.id.substring(0,6)}`); }} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-red-50 text-red-500 shadow-sm" title="Excluir">🗑️</button>

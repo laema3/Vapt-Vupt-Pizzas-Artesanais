@@ -9,6 +9,7 @@ import { WeeklyPizzaSuggestions } from "./WeeklyPizzaSuggestions.tsx";
 import { BellaBotAdmin } from "./BellaBotAdmin.tsx";
 import { Eye, EyeOff, Bot, Sparkles, Send, CheckCircle2, AlertCircle, RefreshCw, Bell, ExternalLink, MapPin, Trash2 } from 'lucide-react';
 import { printOrderReceipt } from '../utils/printReceipt.ts';
+import { formatOrderNumber } from '../utils/format.ts';
 import { sendTestNtfyNotification } from '../services/ntfyService.ts';
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
@@ -76,11 +77,15 @@ interface AdminPanelProps {
     adminUser: string;
     adminPass: string;
     motoboyPass: string;
+    waiterPass?: string;
+    motoboys?: { id: string; name: string; pass: string; phone?: string }[];
   };
   onUpdateAuthSettings: (settings: {
     adminUser: string;
     adminPass: string;
     motoboyPass: string;
+    waiterPass?: string;
+    motoboys?: { id: string; name: string; pass: string; phone?: string }[];
   }) => void;
   onAddProduct: (p: Partial<Product>) => Promise<void>;
   onDeleteProduct: (id: string) => Promise<void>;
@@ -123,7 +128,7 @@ interface AdminPanelProps {
   onUpdateScheduleAllowed?: (allowed: boolean) => void;
 }
 
-type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'horarios-agendamento' | 'bellabot' | 'ajustes';
+type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'horarios-agendamento' | 'motoboys' | 'bellabot' | 'ajustes';
 
 type DeleteTarget = {
   type: 'ORDER' | 'PRODUCT' | 'CATEGORY' | 'SUBCATEGORY' | 'COMPLEMENT' | 'COUPON' | 'ZIP' | 'PAYMENT' | 'TABLE';
@@ -261,6 +266,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [localAdminPass, setLocalAdminPass] = useState(authSettings.adminPass || 'admin123');
   const [localMotoboyPass, setLocalMotoboyPass] = useState(authSettings.motoboyPass || 'motoboy123');
   const [localWaiterPass, setLocalWaiterPass] = useState((authSettings as any).waiterPass || 'garcom123');
+
+  const [newMotoboyName, setNewMotoboyName] = useState('');
+  const [newMotoboyPass, setNewMotoboyPass] = useState('');
+  const [newMotoboyPhone, setNewMotoboyPhone] = useState('');
+
+  const handleAddMotoboy = () => {
+    if (!newMotoboyName.trim() || !newMotoboyPass.trim()) {
+      alert('Preencha o nome e a senha do motoboy.');
+      return;
+    }
+    const currentMotoboys = authSettings.motoboys || [];
+    const updated = [
+      ...currentMotoboys,
+      {
+        id: Math.random().toString(36).substring(7),
+        name: newMotoboyName.trim(),
+        pass: newMotoboyPass.trim(),
+        phone: newMotoboyPhone.trim()
+      }
+    ];
+    onUpdateAuthSettings({
+      ...authSettings,
+      motoboys: updated
+    });
+    setNewMotoboyName('');
+    setNewMotoboyPass('');
+    setNewMotoboyPhone('');
+  };
+
+  const handleRemoveMotoboy = (id: string) => {
+    const currentMotoboys = authSettings.motoboys || [];
+    const updated = currentMotoboys.filter(m => m.id !== id);
+    onUpdateAuthSettings({
+      ...authSettings,
+      motoboys: updated
+    });
+  };
 
   const [localAddress, setLocalAddress] = useState(socialLinks?.address || 'Rua Exemplo, 123 - Centro');
   const [localCity, setLocalCity] = useState(socialLinks?.city || 'Uberaba - MG');
@@ -807,6 +849,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
           <NavItem active={activeView === 'pagamentos'} icon="💳" label="Pagamentos" onClick={() => handleNavClick('pagamentos')} />
           <NavItem active={activeView === 'horarios'} icon="⏰" label="Horários" onClick={() => handleNavClick('horarios')} />
           <NavItem active={activeView === 'horarios-agendamento'} icon="📅" label="Horários de Agendamento" onClick={() => handleNavClick('horarios-agendamento')} />
+          <NavItem active={activeView === 'motoboys'} icon="🛵" label="Motoboys" onClick={() => handleNavClick('motoboys')} />
           <NavItem active={activeView === 'bellabot'} icon="🤖" label="BellaBot IA" onClick={() => handleNavClick('bellabot')} />
           <NavItem active={activeView === 'ajustes'} icon="⚙️" label="Ajustes" onClick={() => handleNavClick('ajustes')} />
         </nav>
@@ -864,6 +907,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Produtos Ativos</p>
                    <p className="text-4xl font-black text-purple-600 mt-2">{products.length}</p>
                  </div>
+               </div>
+            )}
+
+            {activeView === 'motoboys' && (
+               <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in">
+                  <div className="bg-white p-8 sm:p-12 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
+                    <div className="text-center">
+                      <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto text-4xl font-black shadow-inner">🛵</div>
+                      <h2 className="text-3xl font-black uppercase tracking-tight text-slate-800 mt-4">Gerenciamento de Motoboys</h2>
+                      <p className="text-slate-500 text-xs sm:text-sm mt-1 font-medium">Cadastre usuários e senhas individuais para os entregadores acessarem o Portal do Motoboy.</p>
+                    </div>
+
+                    {/* Formulário de Cadastro */}
+                    <div className="bg-slate-50 p-6 sm:p-8 rounded-3xl border border-slate-200 space-y-4">
+                      <h3 className="text-base font-black uppercase text-slate-800">Novo Motoboy</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-600 block mb-1">Nome do Motoboy</label>
+                          <input type="text" value={newMotoboyName} onChange={e => setNewMotoboyName(e.target.value)} placeholder="Ex: Carlos Silva" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-800" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-600 block mb-1">Senha de Acesso</label>
+                          <input type="password" value={newMotoboyPass} onChange={e => setNewMotoboyPass(e.target.value)} placeholder="Ex: motoboy123" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-800" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-600 block mb-1">Telefone / WhatsApp</label>
+                          <input type="text" value={newMotoboyPhone} onChange={e => setNewMotoboyPhone(e.target.value)} placeholder="Ex: (34) 99999-9999" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-800" />
+                        </div>
+                      </div>
+                      <button onClick={handleAddMotoboy} className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-red-600/20 transition-all cursor-pointer">
+                        + Cadastrar Motoboy
+                      </button>
+                    </div>
+
+                    {/* Lista de Motoboys Cadastrados */}
+                    <div className="space-y-4">
+                      <h3 className="text-base font-black uppercase text-slate-800">Motoboys Cadastrados ({authSettings.motoboys?.length || 0})</h3>
+                      {(!authSettings.motoboys || authSettings.motoboys.length === 0) ? (
+                        <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-3xl border border-slate-100 text-xs font-bold">
+                          Nenhum motoboy cadastrado individualmente. (Atualmente é utilizada a senha padrão genérica).
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {authSettings.motoboys.map(m => (
+                            <div key={m.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
+                              <div className="space-y-1">
+                                <div className="font-black text-slate-800 text-sm uppercase flex items-center gap-2">🛵 {m.name}</div>
+                                <div className="text-xs text-slate-500 font-bold">Senha: <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">{m.pass}</span></div>
+                                {m.phone && <div className="text-[11px] text-slate-400 font-medium">📞 {m.phone}</div>}
+                              </div>
+                              <button onClick={() => handleRemoveMotoboy(m.id)} className="p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-black text-xs transition-colors cursor-pointer" title="Remover Motoboy">
+                                🗑️
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                </div>
             )}
 
@@ -936,7 +1038,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                           <div className="flex-1 p-8 flex flex-col justify-between">
                             <div className="space-y-4">
                                <div className="flex flex-wrap items-center gap-3">
-                                 <span className="text-2xl font-black text-slate-800">#{order.id.substring(0,6)}</span>
+                                 <span className="text-2xl font-black text-slate-800">#{order.orderNumber ? formatOrderNumber(order.orderNumber) : formatOrderNumber(orders.indexOf(order) + 1)}</span>
                                  
                                  {/* SELOS DE PAGAMENTO */}
                                  {order.paymentMethod.toUpperCase().includes('MERCADO PAGO') ? (
@@ -1035,7 +1137,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                           <div className="w-full bg-slate-50 border-t md:border-t-0 md:border-l border-slate-200 flex flex-row items-center justify-center gap-4 p-4">
                              <button onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/${order.customerPhone.replace(/\D/g,'')}`, '_blank'); }} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-red-50 text-red-600 shadow-sm" title="WhatsApp">📞</button>
                              <button onClick={(e) => { e.stopPropagation(); handlePrintOrder(order); }} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 shadow-sm" title="Imprimir Cupom">🖨️</button>
-                             <button onClick={(e) => { e.stopPropagation(); requestDelete('ORDER', order.id, `Pedido #${order.id.substring(0,6)}`); }} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-red-50 text-red-500 shadow-sm" title="Excluir">🗑️</button>
+                             <button onClick={(e) => { e.stopPropagation(); requestDelete('ORDER', order.id, `Pedido #${order.orderNumber ? formatOrderNumber(order.orderNumber) : formatOrderNumber(orders.indexOf(order) + 1)}`); }} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-red-50 text-red-500 shadow-sm" title="Excluir">🗑️</button>
                           </div>
                         </div>
                       ))}

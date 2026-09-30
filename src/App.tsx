@@ -176,7 +176,8 @@ const App: React.FC = () => {
     adminUser: 'admin',
     adminPass: 'admin123',
     motoboyPass: 'motoboy123',
-    waiterPass: 'garcom123'
+    waiterPass: 'garcom123',
+    motoboys: [] as { id: string; name: string; pass: string; phone?: string }[]
   });
 
   const [botSettings, setBotSettings] = useState<BotSettings>(() => {
@@ -504,7 +505,8 @@ const App: React.FC = () => {
               adminUser: auth.adminUser || 'admin',
               adminPass: auth.adminPass || 'admin123',
               motoboyPass: auth.motoboyPass || 'motoboy123',
-              waiterPass: auth.waiterPass || 'garcom123'
+              waiterPass: auth.waiterPass || 'garcom123',
+              motoboys: auth.motoboys || []
             });
           }
         }
@@ -621,7 +623,8 @@ const App: React.FC = () => {
                       adminUser: auth.adminUser || 'admin',
                       adminPass: auth.adminPass || 'admin123',
                       motoboyPass: auth.motoboyPass || 'motoboy123',
-                      waiterPass: auth.waiterPass || 'garcom123'
+                      waiterPass: auth.waiterPass || 'garcom123',
+                      motoboys: auth.motoboys || []
                     });
                 }
             }
@@ -1731,6 +1734,7 @@ const App: React.FC = () => {
           setActiveView('motoboy'); 
         }} 
         correctPass={authSettings.motoboyPass}
+        motoboys={authSettings.motoboys}
       />
 
       <WaiterLoginModal 

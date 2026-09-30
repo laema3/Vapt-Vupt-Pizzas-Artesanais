@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 
 interface MotoboyLoginModalProps {
@@ -6,14 +5,26 @@ interface MotoboyLoginModalProps {
   onClose: () => void;
   onSuccess: (name: string) => void;
   correctPass: string;
+  motoboys?: { id: string; name: string; pass: string; phone?: string }[];
 }
 
-export const MotoboyLoginModal: React.FC<MotoboyLoginModalProps> = ({ isOpen, onClose, onSuccess, correctPass }) => {
+export const MotoboyLoginModal: React.FC<MotoboyLoginModalProps> = ({ isOpen, onClose, onSuccess, correctPass, motoboys }) => {
   const [pass, setPass] = useState('');
   const [name, setName] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanName = name.trim().toLowerCase();
+
+    if (motoboys && motoboys.length > 0) {
+      const found = motoboys.find(m => m.name.trim().toLowerCase() === cleanName && m.pass === pass);
+      if (found) {
+        onSuccess(found.name);
+        onClose();
+        return;
+      }
+    }
+
     if (pass === correctPass) {
       if (!name.trim()) {
         alert('Por favor, digite seu nome');
@@ -22,7 +33,7 @@ export const MotoboyLoginModal: React.FC<MotoboyLoginModalProps> = ({ isOpen, on
       onSuccess(name.trim());
       onClose();
     } else {
-      alert('Credenciais inválidas');
+      alert('Credenciais inválidas (Nome ou Senha incorretos)');
     }
   };
 

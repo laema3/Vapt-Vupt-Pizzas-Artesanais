@@ -1,4 +1,4 @@
 export const formatOrderNumber = (num?: number): string => {
-  if (num === undefined) return '---';
-  return num.toString().padStart(3, '0');
+  if (num === undefined || isNaN(num)) return '0001';
+  return num.toString().padStart(4, '0');
 };

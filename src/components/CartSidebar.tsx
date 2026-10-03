@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange } from '../types';
-import { checkZipCoverage, fetchAddressByCep } from '../utils/zipUtils';
+import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange, Product, CategoryItem } from '../types';
+import { checkZipCoverage, fetchAddressByCep, parseAddressParts, buildFullAddress } from '../utils/zipUtils';
 import { sendOutOfAreaNotification } from '../services/ntfyService';
+import { SuggestedProductsCarousel } from './SuggestedProductsCarousel';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -40,18 +41,25 @@ interface CartSidebarProps {
   scheduledTime?: string | null;
   onOpenScheduleModal?: () => void;
   scheduleAllowed?: boolean;
+  allProducts?: Product[];
+  categories?: CategoryItem[];
+  onAddSuggestedProduct?: (product: Product, quantity: number) => void;
+  logoUrl?: string;
 }
 
 export const CartSidebar: React.FC<CartSidebarProps> = ({ 
   isOpen, onClose, items, coupons, onUpdateQuantity, onRemove, onCheckout, onAuthClick, 
   paymentSettings, tables, currentUser, isKioskMode, deliveryFee, availableCoupons, isStoreOpen, isProcessing,
-  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic, scheduledTime, onOpenScheduleModal, scheduleAllowed = true
+  onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic, scheduledTime, onOpenScheduleModal, scheduleAllowed = true,
+  allProducts = [], categories = [], onAddSuggestedProduct, logoUrl
 }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [changeFor, setChangeFor] = useState<number | undefined>(undefined);
-  const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(defaultTableId ? 'TABLE' : null);
+  const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(
+    forcedDeliveryType || (defaultTableId ? 'TABLE' : (currentUser ? 'DELIVERY' : null))
+  );
   const [selectedTableId, setSelectedTableId] = useState<string>(defaultTableId || '');
   const [orderObservations, setOrderObservations] = useState('');
 
@@ -68,9 +76,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   };
 
   // Endereço e CEP para entrega
-  const [zipCode, setZipCode] = useState('');
-  const [address, setAddress] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
+  const [zipCode, setZipCode] = useState(currentUser?.zipCode || '');
+  const [address, setAddress] = useState(currentUser?.address || '');
+  const [neighborhood, setNeighborhood] = useState(currentUser?.neighborhood || '');
+  const [street, setStreet] = useState(() => currentUser ? parseAddressParts(currentUser.address).street : '');
+  const [number, setNumber] = useState(() => currentUser ? parseAddressParts(currentUser.address).number : '');
+  const [complement, setComplement] = useState(() => currentUser ? parseAddressParts(currentUser.address).complement : '');
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [isFetchingAddress, setIsFetchingAddress] = useState(false);
 
   // Nome e WhatsApp do cliente (quando não logado)
@@ -105,11 +117,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
   useEffect(() => {
     if (currentUser) {
-      setZipCode(currentUser.zipCode || '');
-      setAddress(currentUser.address || '');
-      setNeighborhood(currentUser.neighborhood || '');
+      if (currentUser.zipCode) setZipCode(currentUser.zipCode);
+      if (currentUser.address) {
+        setAddress(currentUser.address);
+        const parts = parseAddressParts(currentUser.address);
+        setStreet(parts.street);
+        setNumber(parts.number);
+        setComplement(parts.complement);
+      }
+      if (currentUser.neighborhood) setNeighborhood(currentUser.neighborhood);
+      if (!forcedDeliveryType && !defaultTableId) {
+        setDeliveryType(prev => prev || 'DELIVERY');
+      }
     }
-  }, [currentUser, isOpen]);
+  }, [currentUser, isOpen, forcedDeliveryType, defaultTableId]);
 
   useEffect(() => {
     if (defaultTableId) {
@@ -143,13 +164,16 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       let foundCity = '';
 
       if (res && res.address) {
-        setAddress(res.address);
-        foundAddress = res.address;
+        setStreet(res.address);
         if (res.neighborhood) {
           setNeighborhood(res.neighborhood);
           foundNeighborhood = res.neighborhood;
         }
         if (res.city) foundCity = res.city;
+
+        const newAddr = buildFullAddress(res.address, number, complement);
+        setAddress(newAddr);
+        foundAddress = newAddr;
 
         // Se o CEP estiver fora da cobertura de entrega da pizzaria, notifica imediatamente
         if (zipRanges && zipRanges.length > 0) {
@@ -245,9 +269,15 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       return;
     }
 
+    const effectiveStreet = (street || '').trim();
+    const effectiveNumber = (number || '').trim();
+    const finalAddress = buildFullAddress(effectiveStreet, effectiveNumber, complement) || address.trim();
+
     if (deliveryType === 'DELIVERY') {
-      if (!zipCode || !address || !neighborhood) {
-        const msg = 'Favor preencher o CEP e o endereço completo para entrega.';
+      if (!zipCode || !effectiveStreet || !effectiveNumber || !neighborhood) {
+        const msg = !effectiveNumber 
+          ? 'Por favor, informe o número da sua residência para a entrega.' 
+          : 'Favor preencher o CEP e o endereço completo para entrega.';
         if (onShowToast) onShowToast(msg, 'error');
         else alert(msg);
         return;
@@ -260,7 +290,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           customerName: effectiveCustomerName,
           customerPhone: effectiveCustomerPhone,
           customerEmail: effectiveCustomerEmail,
-          address,
+          address: finalAddress,
           neighborhood,
           cartTotal: total,
           itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
@@ -308,7 +338,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       ? `${paymentMethod}${suffix}`
       : paymentMethod;
 
-    const deliveryAddressInfo = deliveryType === 'DELIVERY' ? { address, neighborhood, zipCode } : undefined;
+    const deliveryAddressInfo = deliveryType === 'DELIVERY' ? { address: finalAddress, neighborhood, zipCode } : undefined;
 
     onCheckout(
       finalPaymentMethod, 
@@ -462,6 +492,28 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   </div>
                 </div>
               ))}
+
+              {/* Sugestões de outros itens no carrinho */}
+              {allProducts && allProducts.length > 0 && (
+                <div className="pt-2">
+                  <div className="bg-gradient-to-r from-amber-500/5 via-orange-500/5 to-red-500/5 p-3 rounded-2xl border border-amber-200/60 shadow-xs">
+                    <SuggestedProductsCarousel
+                      allProducts={allProducts}
+                      categories={categories}
+                      onAddProduct={(prod, qty) => {
+                        if (onAddSuggestedProduct) {
+                          onAddSuggestedProduct(prod, qty);
+                        }
+                      }}
+                      onUpdateQuantity={(id, delta) => onUpdateQuantity(id, delta)}
+                      cartItems={items}
+                      title="Outros itens que você pode gostar"
+                      subtitle="Aproveite para incluir bebidas geladas ou sobremesas no seu pedido"
+                      logoUrl={logoUrl}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -514,6 +566,47 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       {isFetchingAddress && <span className="text-[10px] font-bold text-red-600 animate-pulse">Buscando CEP...</span>}
                     </div>
 
+                    {currentUser && (
+                      <div className="p-3.5 rounded-xl bg-red-50/70 border border-red-100 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">👤</span>
+                            <div>
+                              <span className="font-black text-slate-800 uppercase block text-[11px]">
+                                {currentUser.name}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-bold">
+                                📞 {currentUser.phone}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Cadastrado
+                          </span>
+                        </div>
+
+                        {street && number && !isEditingAddress ? (
+                          <div className="pt-2 border-t border-red-100 flex items-center justify-between gap-2">
+                            <div>
+                              <p className="font-black text-slate-900 text-xs">
+                                📍 {street}, {number}{complement ? ` - ${complement}` : ''}
+                              </p>
+                              <p className="text-[10px] font-bold text-slate-500">
+                                {neighborhood} • CEP: {zipCode}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingAddress(true)}
+                              className="text-[10px] font-black text-red-600 hover:text-red-800 underline uppercase cursor-pointer shrink-0"
+                            >
+                              Alterar
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+
                     {!currentUser && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-slate-100">
                         <div>
@@ -539,36 +632,97 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       </div>
                     )}
 
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">CEP</label>
-                      <input 
-                        type="text" 
-                        value={zipCode} 
-                        onChange={e => handleZipCodeChange(e.target.value)} 
-                        placeholder="Ex: 38000-000" 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Endereço (Rua, Número, Comp.)</label>
-                      <input 
-                        type="text" 
-                        value={address} 
-                        onChange={e => setAddress(e.target.value)} 
-                        placeholder="Rua das Flores, 123" 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Bairro</label>
-                      <input 
-                        type="text" 
-                        value={neighborhood} 
-                        onChange={e => setNeighborhood(e.target.value)} 
-                        placeholder="Centro" 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
-                      />
-                    </div>
+                    {(!currentUser || !street || !number || isEditingAddress) && (
+                      <div className="space-y-3 pt-1">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                            CEP <span className="text-red-600">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={zipCode} 
+                            onChange={e => handleZipCodeChange(e.target.value)} 
+                            placeholder="Ex: 38000-000" 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                            Rua / Logradouro <span className="text-red-600">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={street} 
+                            onChange={e => {
+                              const s = e.target.value;
+                              setStreet(s);
+                              setAddress(buildFullAddress(s, number, complement));
+                            }} 
+                            placeholder="Ex: Rua das Flores" 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest block mb-1 text-red-600">
+                              Número <span className="text-red-600">*</span>
+                            </label>
+                            <input 
+                              type="text" 
+                              value={number} 
+                              onChange={e => {
+                                const n = e.target.value;
+                                setNumber(n);
+                                setAddress(buildFullAddress(street, n, complement));
+                              }} 
+                              placeholder="Ex: 123" 
+                              className="w-full bg-slate-50 border-2 border-red-200 rounded-xl px-3 py-2 text-xs font-black text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                              Complemento
+                            </label>
+                            <input 
+                              type="text" 
+                              value={complement} 
+                              onChange={e => {
+                                const c = e.target.value;
+                                setComplement(c);
+                                setAddress(buildFullAddress(street, number, c));
+                              }} 
+                              placeholder="Apto, Bloco..." 
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                            Bairro <span className="text-red-600">*</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            value={neighborhood} 
+                            onChange={e => setNeighborhood(e.target.value)} 
+                            placeholder="Centro" 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                          />
+                        </div>
+
+                        {currentUser && isEditingAddress && (
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingAddress(false)}
+                            className="text-[10px] font-black text-slate-500 hover:text-slate-800 underline uppercase cursor-pointer block text-center w-full pt-1"
+                          >
+                            ✓ Concluir edição do endereço
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {zipCode && (
                       <>
                         {isZipOutOfArea ? (

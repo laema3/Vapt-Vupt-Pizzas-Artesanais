@@ -52,7 +52,7 @@ export interface CartItem extends Product {
   selectedAdditionals?: Complement[];
 }
 
-export type OrderStatus = 'NOVO' | 'PREPARANDO' | 'PRONTO PARA RETIRADA' | 'SAIU PARA ENTREGA' | 'FINALIZADO' | 'CANCELADO' | 'AGUARDANDO PAGAMENTO';
+export type OrderStatus = 'NOVO' | 'PREPARANDO' | 'PRONTO PARA RETIRADA' | 'SAIU PARA ENTREGA' | 'FINALIZADO' | 'CANCELADO' | 'AGUARDANDO PAGAMENTO' | 'NA FILA DE AGENDAMENTO';
 export type DeliveryType = 'DELIVERY' | 'PICKUP' | 'TABLE';
 
 export interface Table {

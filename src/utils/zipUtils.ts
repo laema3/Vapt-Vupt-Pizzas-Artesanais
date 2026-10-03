@@ -103,3 +103,47 @@ export async function fetchAddressByCep(zipCode: string): Promise<{ address?: st
     return null;
   }
 }
+
+/**
+ * Separa com precisão logradouro/rua, número e complemento de uma string de endereço
+ */
+export function parseAddressParts(fullAddress: string): { street: string; number: string; complement: string } {
+  if (!fullAddress) return { street: '', number: '', complement: '' };
+
+  const trimmed = fullAddress.trim();
+  const commaIndex = trimmed.indexOf(',');
+  if (commaIndex !== -1) {
+    const street = trimmed.substring(0, commaIndex).trim();
+    const afterComma = trimmed.substring(commaIndex + 1).trim();
+    const dashIndex = afterComma.indexOf('-');
+    if (dashIndex !== -1) {
+      const number = afterComma.substring(0, dashIndex).trim();
+      const complement = afterComma.substring(dashIndex + 1).trim();
+      return { street, number, complement };
+    }
+    return { street, number: afterComma, complement: '' };
+  }
+
+  // Tenta extrair número por regex se não tiver vírgula
+  const match = trimmed.match(/^(.*?)(?:,\s*|\s+n[º°]?\s*|\s+)(\d+[\w\s/]*?)(?:\s*-\s*(.*))?$/i);
+  if (match && match[2]) {
+    return {
+      street: match[1]?.trim() || trimmed,
+      number: match[2]?.trim() || '',
+      complement: match[3]?.trim() || ''
+    };
+  }
+
+  return { street: trimmed, number: '', complement: '' };
+}
+
+/**
+ * Reconstrói o endereço completo mantendo rua, número e complemento
+ */
+export function buildFullAddress(street: string, number: string, complement?: string): string {
+  const s = (street || '').trim();
+  const n = (number || '').trim();
+  const c = (complement || '').trim();
+  if (!n) return s;
+  return `${s}, ${n}${c ? ` - ${c}` : ''}`;
+}

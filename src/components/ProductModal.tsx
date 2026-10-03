@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Product, Complement, CategoryItem } from '../types';
+import { Product, Complement, CategoryItem, CartItem } from '../types';
+import { SuggestedProductsCarousel } from './SuggestedProductsCarousel';
 
 interface ProductModalProps {
   product: Product | null;
@@ -24,6 +25,9 @@ interface ProductModalProps {
   isStoreOpen: boolean;
   logoUrl: string;
   scheduleAllowed?: boolean;
+  onAddSuggestedProduct?: (product: Product, quantity: number) => void;
+  cartItems?: CartItem[];
+  onUpdateCartQuantity?: (productId: string, delta: number) => void;
 }
 
 const NO_BORDA_COMPLEMENT: Complement = {
@@ -105,7 +109,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   onAdd, 
   isStoreOpen, 
   logoUrl,
-  scheduleAllowed = true
+  scheduleAllowed = true,
+  onAddSuggestedProduct,
+  cartItems = [],
+  onUpdateCartQuantity
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [bordaSelection, setBordaSelection] = useState<Complement | 'NONE' | null>(null);
@@ -859,6 +866,31 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Carrossel de Sugestões de Outros Itens na Hora da Compra */}
+          {allProducts && allProducts.length > 0 && (
+            <div className="pt-4 border-t border-slate-100">
+              <div className="bg-gradient-to-r from-amber-500/5 via-orange-500/5 to-red-500/5 p-3.5 sm:p-4 rounded-3xl border border-amber-200/70 shadow-xs">
+                <SuggestedProductsCarousel
+                  currentProduct={product}
+                  allProducts={allProducts}
+                  categories={categories}
+                  onAddProduct={(suggested, qty) => {
+                    if (onAddSuggestedProduct) {
+                      onAddSuggestedProduct(suggested, qty);
+                    } else {
+                      onAdd(suggested, qty);
+                    }
+                  }}
+                  onUpdateQuantity={onUpdateCartQuantity}
+                  cartItems={cartItems}
+                  title="Outros itens que você pode gostar"
+                  subtitle="Aproveite para incluir bebidas geladas ou sobremesas no seu pedido"
+                  logoUrl={logoUrl}
+                />
               </div>
             </div>
           )}

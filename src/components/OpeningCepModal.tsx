@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ZipRange, Order } from '../types';
+import { ZipRange, Order, Customer } from '../types';
 import { checkZipCoverage, fetchAddressByCep } from '../utils/zipUtils';
 import { safeStorage } from '../utils/safeStorage';
 
 interface OpeningCepModalProps {
   isOpen: boolean;
+  onClose?: () => void;
+  currentUser?: Customer | null;
   zipRanges: ZipRange[];
   orders?: Order[];
   storeName?: string;
@@ -24,6 +26,8 @@ const ALL_SCHEDULE_HOURS = [
 
 export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   isOpen,
+  onClose,
+  currentUser,
   zipRanges,
   orders = [],
   storeName = 'Bella Borda',
@@ -51,18 +55,19 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setModalStep(initialStep);
-      const savedCep = safeStorage.getItem('nl_opening_cep');
+      const savedCep = currentUser?.zipCode || safeStorage.getItem('nl_opening_cep');
       if (savedCep) {
         setCepInput(savedCep);
         const coverage = checkZipCoverage(savedCep, zipRanges);
         setResult({
           checked: true,
           isCovered: coverage.isCovered,
-          fee: coverage.fee
+          fee: coverage.fee,
+          addressInfo: currentUser ? { address: currentUser.address, neighborhood: currentUser.neighborhood } : undefined
         });
       }
     }
-  }, [isOpen, initialStep, zipRanges]);
+  }, [isOpen, initialStep, zipRanges, currentUser]);
 
   if (!isOpen) return null;
 
@@ -131,7 +136,10 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
 
   const handleFinalizeNormal = () => {
     if (pendingAction === 'DELIVERY') {
-      onVerifySuccess(cepInput, result.addressInfo || {}, result.fee, null);
+      const resolvedAddrInfo = (currentUser && currentUser.address && !result.addressInfo?.address) 
+        ? { address: currentUser.address, neighborhood: currentUser.neighborhood } 
+        : (result.addressInfo || (currentUser ? { address: currentUser.address, neighborhood: currentUser.neighborhood } : {}));
+      onVerifySuccess(cepInput, resolvedAddrInfo, result.fee, null);
     } else {
       onChoosePickup(null);
     }
@@ -207,7 +215,17 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col transform animate-in zoom-in-95 duration-300">
+      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col transform animate-in zoom-in-95 duration-300 relative">
+        {onClose && (
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center font-bold text-lg transition-colors cursor-pointer"
+            title="Fechar"
+          >
+            ✕
+          </button>
+        )}
         
         {/* Header decorativo */}
         <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 p-6 sm:p-8 text-white text-center relative overflow-hidden">
@@ -237,6 +255,46 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
         <div className="p-6 sm:p-8 space-y-6">
           {modalStep === 'INPUT' && (
             <>
+              {currentUser && currentUser.address && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 space-y-3 text-left animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase text-red-700 flex items-center gap-1.5">
+                      <span>👤</span> Olá, {currentUser.name}
+                    </span>
+                    <span className="text-[9px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full uppercase">
+                      Endereço Cadastrado
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-800">{currentUser.address}</p>
+                    <p className="text-[11px] font-bold text-slate-500">
+                      {currentUser.neighborhood} {currentUser.zipCode ? `• CEP: ${currentUser.zipCode}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const userZip = currentUser.zipCode || '';
+                      setCepInput(userZip);
+                      const coverage = checkZipCoverage(userZip, zipRanges);
+                      setResult({
+                        checked: true,
+                        isCovered: coverage.isCovered,
+                        fee: coverage.fee,
+                        addressInfo: { address: currentUser.address, neighborhood: currentUser.neighborhood }
+                      });
+                      setPendingAction('DELIVERY');
+                      setModalStep('CHOICE');
+                    }}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-black uppercase text-xs tracking-wider shadow-md active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>Usar Meu Endereço Cadastrado</span>
+                    <span>→</span>
+                  </button>
+                  <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-wider">ou digite outro CEP abaixo se desejar enviar para outro local</p>
+                </div>
+              )}
+
               <form onSubmit={handleCheck} className="space-y-4">
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-2">
@@ -410,7 +468,10 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                         const slot = confirmingSlot;
                         setConfirmingSlot(null);
                         if (pendingAction === 'DELIVERY') {
-                          onVerifySuccess(cepInput, result.addressInfo || {}, result.fee, slot);
+                          const resolvedAddrInfo = (currentUser && currentUser.address && !result.addressInfo?.address) 
+                            ? { address: currentUser.address, neighborhood: currentUser.neighborhood } 
+                            : (result.addressInfo || (currentUser ? { address: currentUser.address, neighborhood: currentUser.neighborhood } : {}));
+                          onVerifySuccess(cepInput, resolvedAddrInfo, result.fee, slot);
                         } else {
                           onChoosePickup(slot);
                         }

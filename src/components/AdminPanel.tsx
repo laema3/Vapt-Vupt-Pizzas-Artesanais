@@ -789,11 +789,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const buttonClass = "bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-red-700 shadow-lg shadow-red-200 transition-all active:scale-95";
   const editButtonClass = "bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95";
 
-  const ORDER_STATUSES: (OrderStatus | 'TODOS')[] = ['TODOS', 'AGUARDANDO PAGAMENTO', 'NOVO', 'PREPARANDO', 'PRONTO PARA RETIRADA', 'SAIU PARA ENTREGA', 'FINALIZADO', 'CANCELADO'];
+  const ORDER_STATUSES: (OrderStatus | 'TODOS')[] = ['TODOS', 'AGUARDANDO PAGAMENTO', 'NA FILA DE AGENDAMENTO', 'NOVO', 'PREPARANDO', 'PRONTO PARA RETIRADA', 'SAIU PARA ENTREGA', 'FINALIZADO', 'CANCELADO'];
 
   const getStatusColorClass = (status: string) => {
     switch (status) {
       case 'AGUARDANDO PAGAMENTO': return 'bg-slate-200 text-slate-600 border-slate-300 animate-pulse';
+      case 'NA FILA DE AGENDAMENTO': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
       case 'NOVO': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'PREPARANDO': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'PRONTO PARA RETIRADA': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
@@ -1058,6 +1059,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                                  <div className="relative z-10">
                                    <select value={order.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { const newStatus = e.target.value as OrderStatus; onUpdateOrderStatus(order.id, newStatus); if (order.status === 'NOVO' && newStatus !== 'NOVO') stopAlarm(); }} className={`appearance-none cursor-pointer pl-4 pr-10 py-2 rounded-xl text-xs font-black uppercase tracking-widest outline-none border-2 transition-all shadow-sm ${getStatusColorClass(order.status)}`}>
                                      <option value="AGUARDANDO PAGAMENTO" disabled={order.deliveryType === 'TABLE'}>Aguardando Pagamento</option>
+                                     <option value="NA FILA DE AGENDAMENTO">Na Fila de Agendamento</option>
                                      <option value="NOVO">Novo</option>
                                      <option value="PREPARANDO">Preparando</option>
                                      <option value="PRONTO PARA RETIRADA" disabled={order.deliveryType === 'TABLE'}>Pronto p/ Retirada</option>

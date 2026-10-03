@@ -101,6 +101,7 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({ orders, onBack, 
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-sm font-black text-slate-400 uppercase tracking-widest">#{order.orderNumber ? formatOrderNumber(order.orderNumber) : order.id.substring(0, 6)}</span>
                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide ${
+                      order.status === 'NA FILA DE AGENDAMENTO' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
                       order.status === 'NOVO' ? 'bg-blue-100 text-blue-600' :
                       order.status === 'PREPARANDO' ? 'bg-yellow-100 text-yellow-600' :
                       order.status === 'SAIU PARA ENTREGA' ? 'bg-purple-100 text-purple-600' :

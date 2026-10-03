@@ -9,7 +9,17 @@ import { GoogleGenAI } from '@google/genai';
 dotenv.config();
 
 export const app = express();
-const PORT = process.env.PORT || 3000;
+const getPort = () => {
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    return parseInt(process.argv[portArgIndex + 1], 10);
+  }
+  if (process.env.PORT && process.env.PORT !== '8080') {
+    return parseInt(process.env.PORT, 10);
+  }
+  return 3000;
+};
+const PORT = getPort();
 
 app.use(cors());
 app.use(express.json());
@@ -180,19 +190,33 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
             const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
             const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/orders/${orderId}?updateMask.fieldPaths=status&updateMask.fieldPaths=paymentMethod`;
             
+            // Verifica se o pedido possui horário agendado
+            let targetStatus = 'NOVO';
+            try {
+              const checkRes = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/orders/${orderId}`);
+              if (checkRes.ok) {
+                const docData = await checkRes.json();
+                if (docData.fields?.scheduledTime?.stringValue) {
+                  targetStatus = 'NA FILA DE AGENDAMENTO';
+                }
+              }
+            } catch (checkErr) {
+              console.warn('[Webhook MP] Erro ao verificar scheduledTime:', checkErr);
+            }
+
             const updateRes = await fetch(firestoreUrl, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 fields: { 
-                  status: { stringValue: 'NOVO' },
+                  status: { stringValue: targetStatus },
                   paymentMethod: { stringValue: methodLabel }
                 }
               })
             });
 
             if (updateRes.ok) {
-              console.log(`[Webhook MP] Pedido ${orderId} atualizado para NOVO (${methodLabel}) com sucesso!`);
+              console.log(`[Webhook MP] Pedido ${orderId} atualizado para ${targetStatus} (${methodLabel}) com sucesso!`);
             } else {
               console.error(`[Webhook MP] Falha ao atualizar pedido ${orderId} no Firestore:`, await updateRes.text());
             }
@@ -812,9 +836,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Vite middleware para desenvolvimento
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  async function setupVite() {
+// Vite middleware para desenvolvimento ou estáticos em produção
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     // Esconde o import do Vite do bundler da Vercel
     const viteName = 'vite';
     const m = await import(/* @vite-ignore */ viteName);
@@ -824,21 +848,20 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
       root: process.cwd(),
     });
     app.use(vite.middlewares);
+  } else if (!process.env.VERCEL) {
+    // Em produção fora da Vercel (ex: Docker ou VPS), servir arquivos estáticos
+    app.use(express.static('dist'));
+    app.get('*', (req, res) => {
+      res.sendFile(path.resolve('dist', 'index.html'));
+    });
   }
-  setupVite();
-} else if (!process.env.VERCEL) {
-  // Em produção fora da Vercel (ex: Docker ou VPS), servir arquivos estáticos
-  app.use(express.static('dist'));
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve('dist', 'index.html'));
-  });
+
+  // O listen só deve rodar se não estivermos na Vercel
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-// O listen só deve rodar se não estivermos na Vercel
-if (!process.env.VERCEL) {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
-
-// Removido o startServer() async que envolvia as rotas
+startServer();

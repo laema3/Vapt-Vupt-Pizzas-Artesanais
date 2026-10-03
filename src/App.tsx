@@ -228,13 +228,40 @@ const App: React.FC = () => {
   const [ntfyTopic, setNtfyTopic] = useState<string>('bellaborda-ceps');
   const [uncoveredCeps, setUncoveredCeps] = useState<UncoveredZipLog[]>([]);
 
+  const [currentUser, setCurrentUser] = useState<Customer | null>(() => {
+    try {
+      const saved = safeStorage.getItem('nl_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
   const [isOpeningCepModalOpen, setIsOpeningCepModalOpen] = useState<boolean>(() => {
     if (window.location.pathname.startsWith('/mesa/')) return false;
+    try {
+      const savedUser = safeStorage.getItem('nl_current_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u && (u.id || u.email || u.zipCode || u.address)) return false;
+      }
+    } catch (_err) {
+      // Ignora erro de JSON
+    }
     return safeStorage.getItem('nl_opening_cep_verified') !== 'true';
   });
   const [cepModalInitialStep, setCepModalInitialStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>('INPUT');
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
   const [scheduleAllowed, setScheduleAllowed] = useState(true);
+
+  // Fecha o modal de CEP e marca como verificado automaticamente para usuários logados
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.zipCode) {
+        safeStorage.setItem('nl_opening_cep_verified', 'true');
+        safeStorage.setItem('nl_opening_cep', currentUser.zipCode);
+      }
+      setIsOpeningCepModalOpen(false);
+    }
+  }, [currentUser]);
 
   const handleOpeningCepVerified = (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number, schedTime?: string | null) => {
     safeStorage.setItem('nl_opening_cep_verified', 'true');
@@ -243,10 +270,11 @@ const App: React.FC = () => {
     setIsOpeningCepModalOpen(false);
 
     if (currentUser) {
+      const hasNumber = currentUser.address && /\d+/.test(currentUser.address);
       const updated = {
         ...currentUser,
         zipCode: cep,
-        address: currentUser.address || addressInfo.address || '',
+        address: hasNumber ? currentUser.address : (currentUser.address || addressInfo.address || ''),
         neighborhood: currentUser.neighborhood || addressInfo.neighborhood || ''
       };
       setCurrentUser(updated);
@@ -286,15 +314,6 @@ const App: React.FC = () => {
       setShowLoaderRetry(false);
     }
   }, [isInitialLoading]);
-
-
-
-  const [currentUser, setCurrentUser] = useState<Customer | null>(() => {
-    try {
-      const saved = safeStorage.getItem('nl_current_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
 
   // Atualiza os ícones de sistema e o MANIFESTO dinamicamente com a logomarca
   useEffect(() => {
@@ -401,8 +420,10 @@ const App: React.FC = () => {
         setToast({ show: true, msg: 'Pagamento confirmado com sucesso!', type: 'success' });
         
         // Atualiza status no banco IMEDIATAMENTE, independente do estado local
-        console.log(`[App] Atualizando pedido ${orderId} para status NOVO (pago)...`);
-        dbService.save('orders', orderId, { status: 'NOVO' })
+        const orderDoc = orders.find(o => o.id === orderId);
+        const targetStatus: OrderStatus = (orderDoc && orderDoc.scheduledTime) ? 'NA FILA DE AGENDAMENTO' : 'NOVO';
+        console.log(`[App] Atualizando pedido ${orderId} para status ${targetStatus} (pago)...`);
+        dbService.save('orders', orderId, { status: targetStatus })
             .then(() => console.log("[App] Pedido atualizado com sucesso no banco."))
             .catch(err => console.error("[App] Erro ao atualizar pedido no banco:", err));
         
@@ -689,10 +710,12 @@ const App: React.FC = () => {
       if (status === 'success') {
         setToast({ show: true, msg: 'Pagamento aprovado com sucesso!', type: 'success' });
         
-        // Atualiza o status do pedido para NOVO
+        // Atualiza o status do pedido para NOVO ou NA FILA DE AGENDAMENTO
         const lastOrderId = safeStorage.getItem('nl_last_order_id');
         if (lastOrderId) {
-          dbService.save('orders', lastOrderId, { status: 'NOVO' });
+          const orderDoc = orders.find(o => o.id === lastOrderId);
+          const targetStatus: OrderStatus = (orderDoc && orderDoc.scheduledTime) ? 'NA FILA DE AGENDAMENTO' : 'NOVO';
+          dbService.save('orders', lastOrderId, { status: targetStatus });
           safeStorage.removeItem('nl_last_order_id');
           setCart([]); // Limpa o carrinho após sucesso
         }
@@ -820,6 +843,51 @@ const App: React.FC = () => {
       type: 'success' 
     });
     setIsCartOpen(true);
+  };
+
+  const handleAddSuggestedProduct = (product: Product, quantity: number = 1) => {
+    setCart(prev => {
+      const existingIndex = prev.findIndex(item => 
+        (item.id === product.id || item.id.startsWith(`${product.id}_`)) &&
+        (!item.selectedComplements || item.selectedComplements.length === 0) &&
+        !item.pizzaMode
+      );
+
+      if (existingIndex >= 0) {
+        return prev.map((item, idx) => 
+          idx === existingIndex 
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      }
+
+      const newCartItem: CartItem = {
+        ...product,
+        id: `${product.id}_${Date.now()}`,
+        name: product.name,
+        price: product.price,
+        quantity,
+      };
+      return [...prev, newCartItem];
+    });
+
+    setToast({ 
+      show: true, 
+      msg: `+${quantity}x ${product.name} adicionado ao pedido!`, 
+      type: 'success' 
+    });
+  };
+
+  const handleUpdateSuggestedQuantity = (cartItemIdOrProductId: string, delta: number) => {
+    setCart(prev => {
+      return prev.map(item => {
+        if (item.id === cartItemIdOrProductId || item.id.startsWith(`${cartItemIdOrProductId}_`)) {
+          const newQty = item.quantity + delta;
+          return newQty > 0 ? { ...item, quantity: newQty } : null;
+        }
+        return item;
+      }).filter(Boolean) as CartItem[];
+    });
   };
 
   const handleCheckout = async (
@@ -1196,7 +1264,7 @@ const App: React.FC = () => {
         const newOrder: Order = {
           id: orderId, customerId: currentUser?.email || 'kiosk', customerName: currentUser?.name || 'Cliente Local', customerPhone: currentUser?.phone || '000',
           customerAddress: resolvedAddress,
-          items: [...cart], total, deliveryFee: fee, deliveryType: (isKioskMode && deliveryType !== 'TABLE') ? 'PICKUP' : deliveryType, status: 'NOVO', paymentMethod: deliveryType === 'TABLE' ? 'PAGAMENTO NO BALCÃO' : paymentMethod, createdAt: new Date().toISOString(), pointsEarned: Math.floor(total), changeFor: changeFor || 0, discountValue: discount || 0, couponCode: couponCode || '', tableId: tableId || '', orderNumber: nextOrderNumber,
+          items: [...cart], total, deliveryFee: fee, deliveryType: (isKioskMode && deliveryType !== 'TABLE') ? 'PICKUP' : deliveryType, status: scheduledTime ? 'NA FILA DE AGENDAMENTO' : 'NOVO', paymentMethod: deliveryType === 'TABLE' ? 'PAGAMENTO NO BALCÃO' : paymentMethod, createdAt: new Date().toISOString(), pointsEarned: Math.floor(total), changeFor: changeFor || 0, discountValue: discount || 0, couponCode: couponCode || '', tableId: tableId || '', orderNumber: nextOrderNumber,
           estimatedMinutes: socialLinks.orderEstimatedMinutes || 30,
           observations: orderObservations || '',
           scheduledTime: scheduledTime || undefined
@@ -1645,9 +1713,28 @@ const App: React.FC = () => {
       )}
       
       <CartSidebar 
-        isOpen={isCartOpen} onClose={() => { setIsCartOpen(false); setForcedDeliveryType(null); }} items={cart} coupons={coupons} onUpdateQuantity={(id, delta) => setCart(prev => prev.map(item => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item))} 
-        onRemove={(id) => setCart(prev => prev.filter(item => item.id !== id))} onCheckout={handleCheckout} onAuthClick={() => setIsAuthModalOpen(true)} paymentSettings={paymentMethods} tables={tables} currentUser={currentUser} isKioskMode={isKioskMode} 
-        deliveryFee={currentDeliveryFee} availableCoupons={coupons} isStoreOpen={isStoreOpen} isProcessing={isOrderProcessing}
+        isOpen={isCartOpen} 
+        onClose={() => { setIsCartOpen(false); setForcedDeliveryType(null); }} 
+        items={cart} 
+        coupons={coupons} 
+        onUpdateQuantity={(id, delta) => setCart(prev => prev.map(item => {
+          if (item.id === id) {
+            const nextQty = item.quantity + delta;
+            return nextQty > 0 ? { ...item, quantity: nextQty } : null;
+          }
+          return item;
+        }).filter(Boolean) as CartItem[])} 
+        onRemove={(id) => setCart(prev => prev.filter(item => item.id !== id))} 
+        onCheckout={handleCheckout} 
+        onAuthClick={() => setIsAuthModalOpen(true)} 
+        paymentSettings={paymentMethods} 
+        tables={tables} 
+        currentUser={currentUser} 
+        isKioskMode={isKioskMode} 
+        deliveryFee={currentDeliveryFee} 
+        availableCoupons={coupons} 
+        isStoreOpen={isStoreOpen} 
+        isProcessing={isOrderProcessing}
         onShowToast={(msg, type) => setToast({ show: true, msg, type })}
         defaultTableId={tableId}
         isAdmin={isAdminAuthenticated}
@@ -1661,6 +1748,10 @@ const App: React.FC = () => {
           setIsCartOpen(false);
         }}
         scheduleAllowed={scheduleAllowed}
+        allProducts={products}
+        categories={categories}
+        onAddSuggestedProduct={handleAddSuggestedProduct}
+        logoUrl={logoUrl}
       />
       <ProductModal 
         product={selectedProduct} 
@@ -1672,9 +1763,14 @@ const App: React.FC = () => {
         isStoreOpen={isStoreOpen} 
         logoUrl={logoUrl} 
         scheduleAllowed={scheduleAllowed}
+        cartItems={cart}
+        onAddSuggestedProduct={handleAddSuggestedProduct}
+        onUpdateCartQuantity={handleUpdateSuggestedQuantity}
       />
       <OpeningCepModal
         isOpen={isOpeningCepModalOpen}
+        onClose={() => setIsOpeningCepModalOpen(false)}
+        currentUser={currentUser}
         zipRanges={zipRanges}
         orders={orders}
         storeName={storeName}
@@ -1692,9 +1788,19 @@ const App: React.FC = () => {
         onLogin={(user) => {
           setCurrentUser(user);
           safeStorage.setItem('nl_current_user', JSON.stringify(user));
+          if (user.zipCode) {
+            safeStorage.setItem('nl_opening_cep_verified', 'true');
+            safeStorage.setItem('nl_opening_cep', user.zipCode);
+          }
+          setIsOpeningCepModalOpen(false);
         }} 
         onSignup={(newCustomer) => {
           dbService.save('customers', newCustomer.id, newCustomer);
+          if (newCustomer.zipCode) {
+            safeStorage.setItem('nl_opening_cep_verified', 'true');
+            safeStorage.setItem('nl_opening_cep', newCustomer.zipCode);
+          }
+          setIsOpeningCepModalOpen(false);
         }} 
         zipRanges={zipRanges} 
         storeWhatsapp={socialLinks?.whatsapp}
@@ -1708,6 +1814,10 @@ const App: React.FC = () => {
           dbService.save('customers', updatedCustomer.id, updatedCustomer);
           setCurrentUser(updatedCustomer);
           safeStorage.setItem('nl_current_user', JSON.stringify(updatedCustomer));
+          if (updatedCustomer.zipCode) {
+            safeStorage.setItem('nl_opening_cep_verified', 'true');
+            safeStorage.setItem('nl_opening_cep', updatedCustomer.zipCode);
+          }
           setToast({ show: true, msg: 'Perfil atualizado com sucesso!', type: 'success' });
         }}
       />

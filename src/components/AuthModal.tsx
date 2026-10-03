@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Customer, ZipRange } from '../types';
 import { dbService } from '../services/dbService';
-import { fetchAddressByCep, checkZipCoverage } from '../utils/zipUtils';
+import { fetchAddressByCep, checkZipCoverage, buildFullAddress } from '../utils/zipUtils';
 import { KeyRound, Eye, EyeOff, CheckCircle2, ArrowLeft, MessageCircle, X } from 'lucide-react';
 
 interface AuthModalProps {
@@ -33,9 +33,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [complement, setComplement] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [zipCode, setZipCode] = useState('');
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
 
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState('');
@@ -86,13 +89,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
         
+        const fullAddress = buildFullAddress(street, number, complement);
         const newCustomer: Customer = {
           id: Math.random().toString(36).substring(7),
           name: name.trim(),
           email: email.trim().toLowerCase(),
           phone: phone.trim(),
           password,
-          address: address.trim(),
+          address: fullAddress,
           neighborhood: neighborhood.trim(),
           zipCode: zipCode.trim(),
           totalOrders: 0,
@@ -454,23 +458,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
                     required 
                   />
-                  <input 
-                    type="text" 
-                    placeholder="Endereço Completo" 
-                    value={address} 
-                    onChange={e => setAddress(e.target.value)} 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
-                    required 
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Bairro" 
-                    value={neighborhood} 
-                    onChange={e => setNeighborhood(e.target.value)} 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
-                    required 
-                  />
+                  
                   <div className="space-y-1">
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">CEP</span>
+                      {isSearchingCep && <span className="text-[10px] font-bold text-red-600 animate-pulse">Buscando CEP...</span>}
+                    </div>
                     <input 
                       type="text" 
                       placeholder="CEP (Ex: 38000-000)" 
@@ -480,9 +473,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         setZipCode(val);
                         const clean = val.replace(/\D/g, '');
                         if (clean.length === 8) {
+                          setIsSearchingCep(true);
                           const res = await fetchAddressByCep(clean);
+                          setIsSearchingCep(false);
                           if (res && res.address) {
-                            setAddress(res.address);
+                            setStreet(res.address);
                             if (res.neighborhood) setNeighborhood(res.neighborhood);
                           }
                         }
@@ -504,6 +499,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </div>
                     )}
                   </div>
+
+                  <input 
+                    type="text" 
+                    placeholder="Rua / Logradouro" 
+                    value={street} 
+                    onChange={e => setStreet(e.target.value)} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
+                    required 
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Número *" 
+                      value={number} 
+                      onChange={e => setNumber(e.target.value)} 
+                      className="w-full bg-slate-50 border-2 border-red-200 rounded-xl px-4 py-3 text-sm font-black text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
+                      required 
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Complemento (Apto, Bloco)" 
+                      value={complement} 
+                      onChange={e => setComplement(e.target.value)} 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
+                    />
+                  </div>
+
+                  <input 
+                    type="text" 
+                    placeholder="Bairro" 
+                    value={neighborhood} 
+                    onChange={e => setNeighborhood(e.target.value)} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
+                    required 
+                  />
                 </>
               )}
               

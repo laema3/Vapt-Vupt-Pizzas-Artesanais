@@ -922,38 +922,41 @@ const App: React.FC = () => {
       : currentUser;
 
     if (effectiveUser && !isKioskMode && !isWaiterAuthenticated) {
-      if (!effectiveUser.email || !effectiveUser.phone || !effectiveUser.address || !effectiveUser.neighborhood || !effectiveUser.zipCode) {
-        setToast({ show: true, msg: 'Por favor, atualize seu cadastro com endereço completo, telefone e e-mail antes de fazer o pedido.', type: 'error' });
+      if (!effectiveUser.phone || !effectiveUser.address) {
+        setToast({ show: true, msg: 'Por favor, atualize seu cadastro com endereço completo e telefone antes de fazer o pedido.', type: 'error' });
         setIsProfileModalOpen(true);
         return;
       }
     }
 
-    // Validação estrita de área de entrega pelo CEP
-    if (deliveryType === 'DELIVERY' && zipRanges && zipRanges.length > 0) {
+    // Validação de área de entrega pelo CEP (somente se não for usuário logado ou se tiver CEP de 8 dígitos informado)
+    if (deliveryType === 'DELIVERY' && !currentUser && zipRanges && zipRanges.length > 0) {
       const targetZip = deliveryAddressInfo?.zipCode || effectiveUser?.zipCode || '';
-      const coverage = checkZipCoverage(targetZip, zipRanges);
-      if (!coverage.isCovered) {
-        sendOutOfAreaNotification({
-          zipCode: targetZip,
-          customerName: effectiveUser?.name || currentUser?.name,
-          customerPhone: effectiveUser?.phone || currentUser?.phone,
-          customerEmail: effectiveUser?.email || currentUser?.email,
-          address: deliveryAddressInfo?.address || effectiveUser?.address,
-          neighborhood: deliveryAddressInfo?.neighborhood || effectiveUser?.neighborhood,
-          cartTotal: cart.reduce((acc, i) => acc + (i.price * i.quantity), 0),
-          itemsCount: cart.reduce((acc, i) => acc + i.quantity, 0),
-          topic: ntfyTopic,
-          reason: 'Tentativa de pedido fora da área atendida',
-          force: true
-        });
-        setToast({ 
-          show: true, 
-          msg: `Infelizmente não realizamos entregas para o CEP ${targetZip || ''} (fora da área atendida). Por favor, selecione a opção de Retirada no Balcão.`, 
-          type: 'error' 
-        });
-        setIsOrderProcessing(false);
-        return;
+      const cleanZip = targetZip.replace(/\D/g, '');
+      if (cleanZip.length === 8) {
+        const coverage = checkZipCoverage(cleanZip, zipRanges);
+        if (!coverage.isCovered) {
+          sendOutOfAreaNotification({
+            zipCode: targetZip,
+            customerName: effectiveUser?.name || currentUser?.name,
+            customerPhone: effectiveUser?.phone || currentUser?.phone,
+            customerEmail: effectiveUser?.email || currentUser?.email,
+            address: deliveryAddressInfo?.address || effectiveUser?.address,
+            neighborhood: deliveryAddressInfo?.neighborhood || effectiveUser?.neighborhood,
+            cartTotal: cart.reduce((acc, i) => acc + (i.price * i.quantity), 0),
+            itemsCount: cart.reduce((acc, i) => acc + i.quantity, 0),
+            topic: ntfyTopic,
+            reason: 'Tentativa de pedido fora da área atendida',
+            force: true
+          });
+          setToast({ 
+            show: true, 
+            msg: `Infelizmente não realizamos entregas para o CEP ${targetZip || ''} (fora da área atendida). Por favor, selecione a opção de Retirada no Balcão.`, 
+            type: 'error' 
+          });
+          setIsOrderProcessing(false);
+          return;
+        }
       }
     }
 

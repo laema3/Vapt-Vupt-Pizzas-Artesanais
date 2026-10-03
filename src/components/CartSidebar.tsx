@@ -226,20 +226,38 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   // Validação e cálculo dinâmico do valor do frete e cobertura de CEP
   const zipCoverage = useMemo(() => {
     if (deliveryType !== 'DELIVERY') return { isCovered: true, fee: 0 };
-    const targetZip = zipCode || currentUser?.zipCode || '';
+    if (currentUser) {
+      if (currentUser.zipCode && zipRanges && zipRanges.length > 0) {
+        const cleanUserZip = currentUser.zipCode.replace(/\D/g, '');
+        if (cleanUserZip.length === 8) {
+          return checkZipCoverage(cleanUserZip, zipRanges);
+        }
+      }
+      return { isCovered: true, fee: deliveryFee };
+    }
+    const targetZip = zipCode || '';
     if (!targetZip) return { isCovered: false, fee: 0 };
     return checkZipCoverage(targetZip, zipRanges);
-  }, [deliveryType, zipCode, currentUser, zipRanges]);
+  }, [deliveryType, zipCode, currentUser, zipRanges, deliveryFee]);
 
-  const cleanCurrentZip = (zipCode || currentUser?.zipCode || '').replace(/\D/g, '');
+  const cleanCurrentZip = (zipCode || '').replace(/\D/g, '');
   const isZipOutOfArea = deliveryType === 'DELIVERY' && 
+                         !currentUser &&
                          cleanCurrentZip.length >= 8 && 
                          zipRanges.length > 0 && 
                          !zipCoverage.isCovered;
 
   const activeDeliveryFee = useMemo(() => {
     if (deliveryType !== 'DELIVERY') return 0;
-    const targetZip = zipCode || currentUser?.zipCode || '';
+    if (currentUser) {
+      const userZip = (currentUser.zipCode || zipCode || '').replace(/\D/g, '');
+      if (userZip.length === 8 && zipRanges && zipRanges.length > 0) {
+        const cov = checkZipCoverage(userZip, zipRanges);
+        if (cov.isCovered && cov.fee !== undefined) return cov.fee;
+      }
+      return deliveryFee;
+    }
+    const targetZip = zipCode || '';
     if (!targetZip) return (zipRanges && zipRanges.length > 0 ? 0 : deliveryFee);
     return zipCoverage.fee;
   }, [deliveryType, zipCode, currentUser, zipRanges, zipCoverage, deliveryFee]);
@@ -271,38 +289,49 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
     const effectiveStreet = (street || '').trim();
     const effectiveNumber = (number || '').trim();
-    const finalAddress = buildFullAddress(effectiveStreet, effectiveNumber, complement) || address.trim();
+    const finalAddress = buildFullAddress(effectiveStreet, effectiveNumber, complement) || address.trim() || currentUser?.address || '';
 
     if (deliveryType === 'DELIVERY') {
-      if (!zipCode || !effectiveStreet || !effectiveNumber || !neighborhood) {
-        const msg = !effectiveNumber 
-          ? 'Por favor, informe o número da sua residência para a entrega.' 
-          : 'Favor preencher o CEP e o endereço completo para entrega.';
-        if (onShowToast) onShowToast(msg, 'error');
-        else alert(msg);
-        return;
-      }
+      if (currentUser) {
+        // Cliente logado: usa o endereço já cadastrado no perfil sem exigir digitação de CEP
+        if (!finalAddress) {
+          const msg = 'Por favor, informe seu endereço para a entrega.';
+          if (onShowToast) onShowToast(msg, 'error');
+          else alert(msg);
+          return;
+        }
+      } else {
+        // Cliente NÃO logado: exige CEP e endereço completo
+        if (!zipCode || !effectiveStreet || !effectiveNumber || !neighborhood) {
+          const msg = !effectiveNumber 
+            ? 'Por favor, informe o número da sua residência para a entrega.' 
+            : 'Favor preencher o CEP e o endereço completo para entrega.';
+          if (onShowToast) onShowToast(msg, 'error');
+          else alert(msg);
+          return;
+        }
 
-      if (zipRanges.length > 0 && !zipCoverage.isCovered) {
-        // Envia notificação imediata via ntfy ao lojista informando a tentativa de pedido com CEP não atendido
-        sendOutOfAreaNotification({
-          zipCode,
-          customerName: effectiveCustomerName,
-          customerPhone: effectiveCustomerPhone,
-          customerEmail: effectiveCustomerEmail,
-          address: finalAddress,
-          neighborhood,
-          cartTotal: total,
-          itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
-          topic: ntfyTopic,
-          reason: 'Tentativa de concluir pedido com CEP fora da área',
-          force: true
-        });
+        if (zipRanges.length > 0 && !zipCoverage.isCovered) {
+          // Envia notificação imediata via ntfy ao lojista informando a tentativa de pedido com CEP não atendido
+          sendOutOfAreaNotification({
+            zipCode,
+            customerName: effectiveCustomerName,
+            customerPhone: effectiveCustomerPhone,
+            customerEmail: effectiveCustomerEmail,
+            address: finalAddress,
+            neighborhood,
+            cartTotal: total,
+            itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+            topic: ntfyTopic,
+            reason: 'Tentativa de concluir pedido com CEP fora da área',
+            force: true
+          });
 
-        const msg = `Infelizmente não realizamos entregas para o CEP ${zipCode} (fora da nossa área de atendimento). Por favor, altere para Retirada no Balcão para concluir seu pedido.`;
-        if (onShowToast) onShowToast(msg, 'error');
-        else alert(msg);
-        return;
+          const msg = `Infelizmente não realizamos entregas para o CEP ${zipCode} (fora da nossa área de atendimento). Por favor, altere para Retirada no Balcão para concluir seu pedido.`;
+          if (onShowToast) onShowToast(msg, 'error');
+          else alert(msg);
+          return;
+        }
       }
     }
 
@@ -338,7 +367,11 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       ? `${paymentMethod}${suffix}`
       : paymentMethod;
 
-    const deliveryAddressInfo = deliveryType === 'DELIVERY' ? { address: finalAddress, neighborhood, zipCode } : undefined;
+    const deliveryAddressInfo = deliveryType === 'DELIVERY' ? { 
+      address: finalAddress, 
+      neighborhood: neighborhood || currentUser?.neighborhood || '', 
+      zipCode: zipCode || currentUser?.zipCode || '' 
+    } : undefined;
 
     onCheckout(
       finalPaymentMethod, 
@@ -580,20 +613,22 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                               </span>
                             </div>
                           </div>
-                          <span className="text-[9px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            Cadastrado
+                          <span className="text-[9px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Conectado
                           </span>
                         </div>
 
-                        {street && number && !isEditingAddress ? (
+                        {!isEditingAddress ? (
                           <div className="pt-2 border-t border-red-100 flex items-center justify-between gap-2">
-                            <div>
+                            <div className="min-w-0">
                               <p className="font-black text-slate-900 text-xs">
-                                📍 {street}, {number}{complement ? ` - ${complement}` : ''}
+                                📍 {street ? `${street}${number ? `, ${number}` : ''}${complement ? ` - ${complement}` : ''}` : (currentUser.address || 'Endereço cadastrado')}
                               </p>
-                              <p className="text-[10px] font-bold text-slate-500">
-                                {neighborhood} • CEP: {zipCode}
-                              </p>
+                              {(neighborhood || currentUser.neighborhood || currentUser.zipCode) && (
+                                <p className="text-[10px] font-bold text-slate-500 truncate">
+                                  {[neighborhood || currentUser.neighborhood, currentUser.zipCode ? `CEP: ${currentUser.zipCode}` : null].filter(Boolean).join(' • ')}
+                                </p>
+                              )}
                             </div>
                             <button
                               type="button"
@@ -603,37 +638,117 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                               Alterar
                             </button>
                           </div>
-                        ) : null}
+                        ) : (
+                          <div className="pt-2 border-t border-red-100 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-slate-700 uppercase">Alterar Endereço de Entrega:</span>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingAddress(false)}
+                                className="text-[10px] font-bold text-slate-500 hover:text-slate-800 underline uppercase cursor-pointer"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                                Rua / Logradouro <span className="text-red-600">*</span>
+                              </label>
+                              <input 
+                                type="text" 
+                                value={street} 
+                                onChange={e => {
+                                  const s = e.target.value;
+                                  setStreet(s);
+                                  setAddress(buildFullAddress(s, number, complement));
+                                }} 
+                                placeholder="Ex: Rua das Flores" 
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest block mb-1 text-red-600">
+                                  Número <span className="text-red-600">*</span>
+                                </label>
+                                <input 
+                                  type="text" 
+                                  value={number} 
+                                  onChange={e => {
+                                    const n = e.target.value;
+                                    setNumber(n);
+                                    setAddress(buildFullAddress(street, n, complement));
+                                  }} 
+                                  placeholder="Ex: 123" 
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                                  Complemento
+                                </label>
+                                <input 
+                                  type="text" 
+                                  value={complement} 
+                                  onChange={e => {
+                                    const c = e.target.value;
+                                    setComplement(c);
+                                    setAddress(buildFullAddress(street, number, c));
+                                  }} 
+                                  placeholder="Apto, Bloco..." 
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                                Bairro <span className="text-red-600">*</span>
+                              </label>
+                              <input 
+                                type="text" 
+                                value={neighborhood} 
+                                onChange={e => setNeighborhood(e.target.value)} 
+                                placeholder="Centro" 
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingAddress(false)}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded-xl uppercase tracking-wider transition-colors cursor-pointer"
+                            >
+                              ✓ Salvar Endereço
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {!currentUser && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-slate-100">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Seu Nome</label>
-                          <input 
-                            type="text" 
-                            value={guestName} 
-                            onChange={e => handleGuestNameChange(e.target.value)} 
-                            placeholder="Nome Completo" 
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">WhatsApp</label>
-                          <input 
-                            type="tel" 
-                            value={guestPhone} 
-                            onChange={e => handleGuestPhoneChange(e.target.value)} 
-                            placeholder="(34) 99999-0000" 
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {(!currentUser || !street || !number || isEditingAddress) && (
                       <div className="space-y-3 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-slate-100">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Seu Nome <span className="text-red-600">*</span></label>
+                            <input 
+                              type="text" 
+                              value={guestName} 
+                              onChange={e => handleGuestNameChange(e.target.value)} 
+                              placeholder="Nome Completo" 
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">WhatsApp <span className="text-red-600">*</span></label>
+                            <input 
+                              type="tel" 
+                              value={guestPhone} 
+                              onChange={e => handleGuestPhoneChange(e.target.value)} 
+                              placeholder="(34) 99999-0000" 
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                            />
+                          </div>
+                        </div>
+
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">
                             CEP <span className="text-red-600">*</span>
@@ -711,19 +826,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
                           />
                         </div>
-
-                        {currentUser && isEditingAddress && (
-                          <button
-                            type="button"
-                            onClick={() => setIsEditingAddress(false)}
-                            className="text-[10px] font-black text-slate-500 hover:text-slate-800 underline uppercase cursor-pointer block text-center w-full pt-1"
-                          >
-                            ✓ Concluir edição do endereço
-                          </button>
-                        )}
                       </div>
                     )}
-                    {zipCode && (
+                    {!currentUser && zipCode && (
                       <>
                         {isZipOutOfArea ? (
                           <div className="p-3.5 rounded-2xl bg-red-100/90 border border-red-300 text-red-800 text-xs font-bold space-y-2.5">

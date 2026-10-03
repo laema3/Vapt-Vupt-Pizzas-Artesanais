@@ -54,17 +54,30 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setModalStep(initialStep);
-      const savedCep = currentUser?.zipCode || safeStorage.getItem('nl_opening_cep');
-      if (savedCep) {
+      if (currentUser) {
+        // Cliente logado nunca é solicitado a digitar CEP
+        setModalStep(initialStep === 'INPUT' ? 'CHOICE' : initialStep);
+        const savedCep = currentUser.zipCode || safeStorage.getItem('nl_opening_cep') || '';
         setCepInput(savedCep);
-        const coverage = checkZipCoverage(savedCep, zipRanges);
+        const coverage = savedCep ? checkZipCoverage(savedCep, zipRanges) : { isCovered: true, fee: 0 };
         setResult({
           checked: true,
-          isCovered: coverage.isCovered,
+          isCovered: true,
           fee: coverage.fee,
-          addressInfo: currentUser ? { address: currentUser.address, neighborhood: currentUser.neighborhood } : undefined
+          addressInfo: { address: currentUser.address, neighborhood: currentUser.neighborhood }
         });
+      } else {
+        setModalStep(initialStep);
+        const savedCep = safeStorage.getItem('nl_opening_cep');
+        if (savedCep) {
+          setCepInput(savedCep);
+          const coverage = checkZipCoverage(savedCep, zipRanges);
+          setResult({
+            checked: true,
+            isCovered: coverage.isCovered,
+            fee: coverage.fee
+          });
+        }
       }
     }
   }, [isOpen, initialStep, zipRanges, currentUser]);
@@ -295,35 +308,37 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleCheck} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-2">
-                    Qual o CEP da sua entrega?
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="text"
-                      placeholder="00000-000"
-                      value={cepInput}
-                      onChange={handleCepChange}
-                      maxLength={9}
-                      className="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-600 focus:bg-white rounded-2xl px-4 py-3.5 text-lg font-bold text-slate-800 text-center tracking-widest outline-none transition-all shadow-inner"
-                      autoFocus
-                    />
-                    <button
-                      type="submit"
-                      disabled={isLoading || cepInput.replace(/\D/g, '').length < 8}
-                      className="w-full sm:w-auto bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0"
-                    >
-                      {isLoading ? (
-                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      ) : (
-                        <span>Consultar</span>
-                      )}
-                    </button>
+              {!currentUser && (
+                <form onSubmit={handleCheck} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-2">
+                      Qual o CEP da sua entrega?
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        placeholder="00000-000"
+                        value={cepInput}
+                        onChange={handleCepChange}
+                        maxLength={9}
+                        className="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-600 focus:bg-white rounded-2xl px-4 py-3.5 text-lg font-bold text-slate-800 text-center tracking-widest outline-none transition-all shadow-inner"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        disabled={isLoading || cepInput.replace(/\D/g, '').length < 8}
+                        className="w-full sm:w-auto bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0"
+                      >
+                        {isLoading ? (
+                          <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        ) : (
+                          <span>Consultar</span>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </form>
+                </form>
+              )}
 
               {/* Resultados da Consulta */}
               {result.checked && (

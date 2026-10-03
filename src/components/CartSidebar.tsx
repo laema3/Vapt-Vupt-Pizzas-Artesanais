@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange, Product, CategoryItem } from '../types';
+import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange, Product, CategoryItem, Order } from '../types';
 import { checkZipCoverage, fetchAddressByCep, parseAddressParts, buildFullAddress } from '../utils/zipUtils';
 import { sendOutOfAreaNotification } from '../services/ntfyService';
 import { SuggestedProductsCarousel } from './SuggestedProductsCarousel';
@@ -45,16 +45,46 @@ interface CartSidebarProps {
   categories?: CategoryItem[];
   onAddSuggestedProduct?: (product: Product, quantity: number) => void;
   logoUrl?: string;
+  orders?: Order[];
+  onSelectScheduledTime?: (time: string | null) => void;
 }
+
+const ALL_SCHEDULE_HOURS = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', 
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', 
+  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'
+];
+
+const getSlotReservedCount = (slot: string, ordersList: Order[] = []) => {
+  return ordersList.filter(o => o.scheduledTime === slot && o.status !== 'CANCELADO' && o.status !== 'FINALIZADO').length;
+};
+
+const getDeliveryTime = (slot: string) => {
+  const [h, m] = slot.split(':').map(Number);
+  const totalMinutes = h * 60 + m + 120; // 2 hours later
+  const delH = Math.floor(totalMinutes / 60) % 24;
+  const delM = totalMinutes % 60;
+  return `${String(delH).padStart(2, '0')}:${String(delM).padStart(2, '0')}`;
+};
+
+const isSlotPassed = (slot: string) => {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const [slotHour, slotMinute] = slot.split(':').map(Number);
+  return currentHour > slotHour || (currentHour === slotHour && currentMinute > slotMinute);
+};
 
 export const CartSidebar: React.FC<CartSidebarProps> = ({ 
   isOpen, onClose, items, coupons, onUpdateQuantity, onRemove, onCheckout, onAuthClick, 
   paymentSettings, tables, currentUser, isKioskMode, deliveryFee, availableCoupons, isStoreOpen, isProcessing,
   onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic, scheduledTime, onOpenScheduleModal, scheduleAllowed = true,
-  allProducts = [], categories = [], onAddSuggestedProduct, logoUrl
+  allProducts = [], categories = [], onAddSuggestedProduct, logoUrl, orders = [], onSelectScheduledTime
 }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [isCouponConfirmed, setIsCouponConfirmed] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [changeFor, setChangeFor] = useState<number | undefined>(undefined);
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(
@@ -62,7 +92,17 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   );
   const [selectedTableId, setSelectedTableId] = useState<string>(defaultTableId || '');
   const [orderObservations, setOrderObservations] = useState('');
+  const [isObservationsConfirmed, setIsObservationsConfirmed] = useState(false);
 
+  // Estados de Agendamento Inline no Checkout
+  const [isSchedulingOpen, setIsSchedulingOpen] = useState(false);
+  const [customTimeInput, setCustomTimeInput] = useState('');
+  const [customTimeError, setCustomTimeError] = useState('');
+
+  const scheduleRef = useRef<HTMLDivElement>(null);
+  const deliveryRef = useRef<HTMLDivElement>(null);
+  const addressRef = useRef<HTMLDivElement>(null);
+  const couponRef = useRef<HTMLDivElement>(null);
   const observationsRef = useRef<HTMLDivElement>(null);
   const paymentRef = useRef<HTMLDivElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
@@ -70,7 +110,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     setTimeout(() => {
       if (ref.current) {
-        ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 120);
   };
@@ -266,24 +306,133 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const discount = appliedCoupon ? (appliedCoupon.type === 'PERCENT' ? subtotal * (appliedCoupon.discount / 100) : appliedCoupon.discount) : 0;
   const total = subtotal + (deliveryType === 'DELIVERY' ? activeDeliveryFee : 0) - discount;
 
+  const isAddressFilled = useMemo(() => {
+    if (deliveryType === 'PICKUP' || deliveryType === 'TABLE') return true;
+    if (deliveryType === 'DELIVERY') {
+      if (currentUser) {
+        // Usuário logado: usa o endereço já cadastrado no perfil sem exigir digitação de CEP
+        return Boolean((street || address || currentUser.address || '').trim());
+      }
+      return Boolean(
+        guestName.trim() && 
+        guestPhone.trim() && 
+        (street.trim() || address.trim()) && 
+        (number.trim() || complement.trim()) && 
+        neighborhood.trim() && 
+        zipCode.trim()
+      );
+    }
+    return false;
+  }, [deliveryType, currentUser, street, address, guestName, guestPhone, number, complement, neighborhood, zipCode]);
+
+  // Modo agendamento: se loja fechada ou se horário estiver preenchido ou se modalidade de agendamento estiver ativa
+  const isSchedulingRequired = (!isStoreOpen || Boolean(scheduledTime) || isSchedulingOpen) && scheduleAllowed;
+  const isScheduleSelected = isSchedulingRequired ? Boolean(scheduledTime) : true;
+  const isCouponSelected = Boolean(appliedCoupon || isCouponConfirmed);
+  const isObservationsSelected = Boolean(isObservationsConfirmed || orderObservations.trim());
+  const isPaymentSelected = Boolean(paymentMethod);
+
+  const isAllOptionsFilled = Boolean(
+    deliveryType && 
+    isAddressFilled && 
+    isScheduleSelected && 
+    isCouponSelected && 
+    isObservationsSelected && 
+    isPaymentSelected
+  );
+
+  const handleSelectSlot = (slot: string) => {
+    const count = getSlotReservedCount(slot, orders);
+    if (count >= 4) {
+      const msg = `⚠️ Este horário (${slot}) já atingiu a capacidade máxima de pedidos. Por favor, escolha outro horário.`;
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      return;
+    }
+    if (isSlotPassed(slot)) {
+      const msg = `⚠️ Este horário (${slot}) já passou. Por favor, escolha um horário disponível.`;
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      return;
+    }
+    if (onSelectScheduledTime) {
+      onSelectScheduledTime(slot);
+    }
+    setIsSchedulingOpen(false);
+    if (onShowToast) {
+      onShowToast(`Horário agendado para às ${slot} (Entrega às ${getDeliveryTime(slot)})!`, 'success');
+    }
+    // Rola automaticamente para a próxima opção: Tipo de Entrega!
+    scrollToSection(deliveryRef);
+  };
+
+  const handleCustomTimeSubmit = () => {
+    let clean = customTimeInput.trim().replace(/\s+/g, '');
+    if (/^\d{4}$/.test(clean)) {
+      clean = clean.slice(0, 2) + ':' + clean.slice(2);
+    }
+    clean = clean.replace('.', ':').replace('h', ':');
+
+    const parts = clean.split(':').map(Number);
+    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+      setCustomTimeError('Por favor, digite um horário válido no formato HH:MM (ex: 17:15).');
+      return;
+    }
+    const [h, m] = parts;
+    if (h < 8 || h > 20 || m < 0 || m > 59) {
+      setCustomTimeError('O horário deve ser entre 08:00 e 20:00.');
+      return;
+    }
+    setCustomTimeError('');
+
+    const targetMinutes = h * 60 + m;
+    let closestSlot = ALL_SCHEDULE_HOURS[0];
+    let minDiff = Infinity;
+    for (const slot of ALL_SCHEDULE_HOURS) {
+      const [sh, sm] = slot.split(':').map(Number);
+      const slotMinutes = sh * 60 + sm;
+      const diff = Math.abs(slotMinutes - targetMinutes);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestSlot = slot;
+      }
+    }
+
+    handleSelectSlot(closestSlot);
+  };
+
   const handleApplyCoupon = () => {
     const coupon = coupons.find(c => c.code === couponCode && c.active);
     if (coupon) {
       setAppliedCoupon(coupon);
+      setIsCouponConfirmed(true);
       if (onShowToast) onShowToast('Cupom aplicado com sucesso!', 'success');
+      // Rola automaticamente para a próxima opção: Observações
+      scrollToSection(observationsRef);
     } else {
-      if (onShowToast) onShowToast('Cupom inválido ou expirado', 'error');
-      else alert('Cupom inválido ou expirado');
+      const msg = '⚠️ Cupom inválido ou expirado';
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
     }
   };
 
   const handleCheckoutClick = () => {
+    // 1. Validação de horário no agendamento
+    if (isSchedulingRequired && !scheduledTime) {
+      const msg = '⚠️ Favor selecionar o horário do agendamento para continuar.';
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      setIsSchedulingOpen(true);
+      scrollToSection(scheduleRef);
+      return;
+    }
+
+    // 2. Tipo de entrega
     if (!deliveryType) {
-      if (onShowToast) {
-        onShowToast('FAVOR SELECIONAR ENTREGA, RETIRADA OU MESA', 'error');
-      } else {
-        alert('FAVOR SELECIONAR ENTREGA, RETIRADA OU MESA');
-      }
+      const msg = '⚠️ Favor selecionar a forma de entrega (Delivery ou Retirada).';
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      scrollToSection(deliveryRef);
       return;
     }
 
@@ -291,23 +440,34 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
     const effectiveNumber = (number || '').trim();
     const finalAddress = buildFullAddress(effectiveStreet, effectiveNumber, complement) || address.trim() || currentUser?.address || '';
 
+    // 3. Endereço de entrega se for delivery
     if (deliveryType === 'DELIVERY') {
       if (currentUser) {
         // Cliente logado: usa o endereço já cadastrado no perfil sem exigir digitação de CEP
         if (!finalAddress) {
-          const msg = 'Por favor, informe seu endereço para a entrega.';
+          const msg = '⚠️ Por favor, informe seu endereço para a entrega.';
+          alert(msg);
           if (onShowToast) onShowToast(msg, 'error');
-          else alert(msg);
+          scrollToSection(addressRef);
           return;
         }
       } else {
-        // Cliente NÃO logado: exige CEP e endereço completo
+        // Cliente NÃO logado: exige Nome, WhatsApp, CEP e endereço completo
+        if (!guestName.trim() || !guestPhone.trim()) {
+          const msg = '⚠️ Favor informar seu Nome e WhatsApp para contato da entrega.';
+          alert(msg);
+          if (onShowToast) onShowToast(msg, 'error');
+          scrollToSection(addressRef);
+          return;
+        }
+
         if (!zipCode || !effectiveStreet || !effectiveNumber || !neighborhood) {
           const msg = !effectiveNumber 
-            ? 'Por favor, informe o número da sua residência para a entrega.' 
-            : 'Favor preencher o CEP e o endereço completo para entrega.';
+            ? '⚠️ Por favor, informe o número da sua residência para a entrega.' 
+            : '⚠️ Favor preencher o CEP e o endereço completo para entrega.';
+          alert(msg);
           if (onShowToast) onShowToast(msg, 'error');
-          else alert(msg);
+          scrollToSection(addressRef);
           return;
         }
 
@@ -328,28 +488,46 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           });
 
           const msg = `Infelizmente não realizamos entregas para o CEP ${zipCode} (fora da nossa área de atendimento). Por favor, altere para Retirada no Balcão para concluir seu pedido.`;
+          alert(msg);
           if (onShowToast) onShowToast(msg, 'error');
-          else alert(msg);
+          scrollToSection(deliveryRef);
           return;
         }
       }
     }
 
     if (deliveryType === 'TABLE' && !selectedTableId) {
-      if (onShowToast) {
-        onShowToast('FAVOR SELECIONAR O NÚMERO DA MESA', 'error');
-      } else {
-        alert('FAVOR SELECIONAR O NÚMERO DA MESA');
-      }
+      const msg = '⚠️ Favor selecionar o número da mesa.';
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      scrollToSection(deliveryRef);
       return;
     }
 
+    // 4. Cupom de desconto
+    if (!appliedCoupon && !isCouponConfirmed) {
+      const msg = '⚠️ Favor aplicar um cupom de desconto ou confirmar clicando em "Não tenho cupom".';
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      scrollToSection(couponRef);
+      return;
+    }
+
+    // 5. Observações do pedido
+    if (!isObservationsConfirmed && !orderObservations.trim()) {
+      const msg = '⚠️ Favor preencher as observações ou clicar em "Sem Observações" para confirmar.';
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      scrollToSection(observationsRef);
+      return;
+    }
+
+    // 6. Forma de pagamento
     if (!paymentMethod) {
-      if (onShowToast) {
-        onShowToast('FAVOR SELECIONAR UMA FORMA DE PAGAMENTO', 'error');
-      } else {
-        alert('FAVOR SELECIONAR UMA FORMA DE PAGAMENTO');
-      }
+      const msg = '⚠️ Favor selecionar a forma de pagamento (Pix, Cartão ou Dinheiro).';
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      scrollToSection(paymentRef);
       return;
     }
     console.log("[CartSidebar] Chamando onCheckout com:", paymentMethod);
@@ -559,17 +737,169 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                 <span>←</span> Continuar Comprando
               </button>
 
-              <div className="space-y-3">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Entrega</h3>
+              <div ref={scheduleRef} className="space-y-3">
+                <div className="bg-amber-50/80 p-4 rounded-2xl border-2 border-amber-200/90 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-amber-950 uppercase tracking-widest flex items-center gap-1.5">
+                      <span>📅</span>
+                      <span>Horário do Pedido {isSchedulingRequired && <span className="text-red-600">*</span>}</span>
+                    </h3>
+                    {scheduledTime ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsSchedulingOpen(prev => !prev)}
+                        className="text-[10px] font-black text-amber-900 hover:text-amber-950 underline uppercase cursor-pointer"
+                      >
+                        {isSchedulingOpen ? 'Fechar Lista' : 'Alterar Horário'}
+                      </button>
+                    ) : (
+                      <span className="text-[9px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full uppercase">
+                        {isStoreOpen ? 'Opcional' : 'Obrigatório'}
+                      </span>
+                    )}
+                  </div>
+
+                  {scheduledTime ? (
+                    <div className="bg-white p-3 rounded-xl border border-amber-300 flex items-center justify-between shadow-xs">
+                      <div>
+                        <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          ⏰ Agendado para às <strong className="text-red-600 text-sm font-black">{scheduledTime}</strong>
+                        </span>
+                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                          Entrega/Preparo prevista para às {getDeliveryTime(scheduledTime)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onSelectScheduledTime) onSelectScheduledTime(null);
+                          setIsSchedulingOpen(true);
+                        }}
+                        className="text-[10px] font-black text-red-600 hover:text-red-800 underline uppercase cursor-pointer"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-amber-900 leading-snug">
+                        {isStoreOpen 
+                          ? 'Deseja agendar para um horário específico ou pedir para entrega imediata?'
+                          : 'A pizzaria está preparando a fornada. Selecione um horário para agendar seu pedido:'}
+                      </p>
+                      {isStoreOpen && (
+                        <div className="flex gap-2 pb-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onSelectScheduledTime) onSelectScheduledTime(null);
+                              setIsSchedulingOpen(false);
+                              scrollToSection(deliveryRef);
+                            }}
+                            className="flex-1 py-2 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm"
+                          >
+                            ⚡ Pedido Imediato
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsSchedulingOpen(true)}
+                            className="flex-1 py-2 bg-amber-400 hover:bg-amber-500 text-amber-950 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm"
+                          >
+                            📅 Escolher Horário
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Lista de Horários Disponíveis */}
+                  {(!scheduledTime || isSchedulingOpen || !isStoreOpen) && (
+                    <div className="space-y-3 pt-2 border-t border-amber-200/60 animate-in fade-in duration-200">
+                      <div className="bg-white border border-amber-200 p-2.5 rounded-xl space-y-1.5 shadow-xs">
+                        <label className="text-[10px] font-black uppercase text-slate-700 block">
+                          Ou digite o horário desejado (Ex: 19:15):
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="HH:MM"
+                            maxLength={5}
+                            value={customTimeInput}
+                            onChange={(e) => setCustomTimeInput(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 w-24 text-center focus:ring-1 focus:ring-red-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleCustomTimeSubmit}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-colors"
+                          >
+                            Confirmar Horário
+                          </button>
+                        </div>
+                        {customTimeError && (
+                          <p className="text-red-600 text-[10px] font-bold mt-1">⚠️ {customTimeError}</p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-48 overflow-y-auto p-1 bg-white/80 rounded-xl border border-amber-200/50">
+                        {ALL_SCHEDULE_HOURS.map(slot => {
+                          const count = getSlotReservedCount(slot, orders);
+                          const remaining = 4 - count;
+                          const isFull = remaining <= 0;
+                          const passed = isSlotPassed(slot);
+                          const isDisabled = isFull || passed;
+                          const isSelected = scheduledTime === slot;
+
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => handleSelectSlot(slot)}
+                              disabled={isDisabled}
+                              className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-red-600 text-white border-red-700 font-black shadow-sm ring-2 ring-red-400'
+                                  : isDisabled
+                                    ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed text-[10px]'
+                                    : 'bg-white hover:bg-red-50 border-slate-200 text-slate-800 font-bold hover:border-red-300'
+                              }`}
+                            >
+                              <span className="block text-xs font-black">{slot}</span>
+                              <span className="block text-[8px] opacity-75">
+                                {isFull ? 'Esgotado' : passed ? 'Passou' : `${remaining} vagas`}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div ref={deliveryRef} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Entrega</h3>
+                  {deliveryType && (
+                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                      ✓ Selecionado: {deliveryType === 'DELIVERY' ? 'Delivery' : deliveryType === 'PICKUP' ? 'Retirada' : 'Mesa'}
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 gap-2">
                   {!defaultTableId && (
                     <>
                       <button 
+                        type="button"
                         onClick={() => {
                           setDeliveryType('DELIVERY');
-                          scrollToSection(observationsRef);
+                          if (currentUser) {
+                            scrollToSection(couponRef);
+                          } else {
+                            scrollToSection(addressRef);
+                          }
                         }} 
-                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm ${deliveryType === 'DELIVERY' ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
+                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm cursor-pointer ${deliveryType === 'DELIVERY' ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide flex items-center gap-2">
                           <span className="text-lg">🛵</span> Delivery
@@ -577,11 +907,12 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                         {deliveryType === 'DELIVERY' && <span className="text-red-600 font-bold">●</span>}
                       </button>
                       <button 
+                        type="button"
                         onClick={() => {
                           setDeliveryType('PICKUP');
-                          scrollToSection(observationsRef);
+                          scrollToSection(couponRef);
                         }} 
-                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm ${deliveryType === 'PICKUP' ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
+                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm cursor-pointer ${deliveryType === 'PICKUP' ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide flex items-center gap-2">
                           <span className="text-lg">🏃</span> Retirada
@@ -593,7 +924,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                 </div>
 
                 {deliveryType === 'DELIVERY' && (
-                  <div className="bg-white p-4 rounded-2xl border border-red-200 space-y-3 mt-3 shadow-sm">
+                  <div ref={addressRef} className="bg-white p-4 rounded-2xl border border-red-200 space-y-3 mt-3 shadow-sm">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide">📍 Endereço de Entrega</h4>
                       {isFetchingAddress && <span className="text-[10px] font-bold text-red-600 animate-pulse">Buscando CEP...</span>}
@@ -624,9 +955,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                               <p className="font-black text-slate-900 text-xs">
                                 📍 {street ? `${street}${number ? `, ${number}` : ''}${complement ? ` - ${complement}` : ''}` : (currentUser.address || 'Endereço cadastrado')}
                               </p>
-                              {(neighborhood || currentUser.neighborhood || currentUser.zipCode) && (
+                              {(neighborhood || currentUser.neighborhood) && (
                                 <p className="text-[10px] font-bold text-slate-500 truncate">
-                                  {[neighborhood || currentUser.neighborhood, currentUser.zipCode ? `CEP: ${currentUser.zipCode}` : null].filter(Boolean).join(' • ')}
+                                  {neighborhood || currentUser.neighborhood}
                                 </p>
                               )}
                             </div>
@@ -714,10 +1045,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                             </div>
                             <button
                               type="button"
-                              onClick={() => setIsEditingAddress(false)}
+                              onClick={() => {
+                                setIsEditingAddress(false);
+                                scrollToSection(couponRef);
+                              }}
                               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded-xl uppercase tracking-wider transition-colors cursor-pointer"
                             >
-                              ✓ Salvar Endereço
+                              ✓ Salvar Endereço e Avançar
                             </button>
                           </div>
                         )}
@@ -826,6 +1160,22 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
                           />
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!guestName.trim() || !guestPhone.trim() || !zipCode || !street.trim() || !number.trim() || !neighborhood.trim()) {
+                              const msg = '⚠️ Favor preencher todos os dados de entrega obrigatórios.';
+                              alert(msg);
+                              if (onShowToast) onShowToast(msg, 'error');
+                              return;
+                            }
+                            scrollToSection(couponRef);
+                          }}
+                          className="w-full bg-slate-900 hover:bg-slate-950 text-white font-black text-xs py-2.5 rounded-xl uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <span>✓ Confirmar Endereço e Ir para Cupom →</span>
+                        </button>
                       </div>
                     )}
                     {!currentUser && zipCode && (
@@ -912,22 +1262,51 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   </div>
                 )}
               </div>
-              <div className="space-y-3">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cupom de Desconto</h3>
+              {/* Seção Cupom de Desconto */}
+              <div ref={couponRef} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cupom de Desconto</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCouponConfirmed(true);
+                      scrollToSection(observationsRef);
+                    }}
+                    className="text-[10px] font-bold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                  >
+                    Não tenho cupom →
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <input 
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="CÓDIGO"
+                    placeholder="CÓDIGO DO CUPOM"
                     className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 uppercase"
                   />
-                  <button onClick={handleApplyCoupon} className="bg-red-600 text-white px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors">Aplicar</button>
+                  <button 
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    className="bg-red-600 text-white px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors cursor-pointer"
+                  >
+                    Aplicar
+                  </button>
                 </div>
-                {appliedCoupon && <p className="text-xs font-bold text-red-600 flex items-center gap-1">✅ Cupom {appliedCoupon.code} aplicado!</p>}
+                {appliedCoupon ? (
+                  <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">✅ Cupom {appliedCoupon.code} aplicado com sucesso!</p>
+                ) : isCouponConfirmed ? (
+                  <p className="text-[11px] font-bold text-slate-400">✓ Opção sem cupom confirmada</p>
+                ) : null}
               </div>
 
+              {/* Seção Observações do Pedido */}
               <div ref={observationsRef} className="space-y-3">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Observações do Pedido</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Observações do Pedido</h3>
+                  {isObservationsConfirmed && (
+                    <span className="text-[10px] font-bold text-emerald-600">✓ Confirmado</span>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <textarea 
                     value={orderObservations}
@@ -936,22 +1315,40 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     rows={2}
                     className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 resize-none shadow-sm"
                   />
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setOrderObservations('');
-                      scrollToSection(paymentRef);
-                    }}
-                    className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>🚫</span>
-                    <span>Sem Observações</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setOrderObservations('');
+                        setIsObservationsConfirmed(true);
+                        scrollToSection(paymentRef);
+                      }}
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <span>🚫 Sem Observações</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setIsObservationsConfirmed(true);
+                        scrollToSection(paymentRef);
+                      }}
+                      className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <span>Ir para Pagamento →</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
+              {/* Seção Pagamento */}
               <div ref={paymentRef} className="space-y-3">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Pagamento</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Pagamento</h3>
+                  {paymentMethod && (
+                    <span className="text-[10px] font-bold text-emerald-600">✓ {paymentMethod}</span>
+                  )}
+                </div>
                 {deliveryType === 'TABLE' ? (
                   <div className="bg-red-50 border border-red-200 p-4 rounded-xl text-red-800 text-xs font-bold uppercase tracking-widest text-center">
                     Pagamento realizado no balcão ao finalizar o consumo.
@@ -961,12 +1358,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     {/* MÉTODOS ONLINE */}
                     {paymentSettings.filter(p => p.enabled && (p.type === 'ONLINE' || p.integration === 'MERCADO_PAGO' || p.integration === 'PAGSEGURO')).map(method => (
                       <button 
+                        type="button"
                         key={method.id}
                         onClick={() => {
                           setPaymentMethod(method.name);
                           scrollToSection(confirmRef);
                         }}
-                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm ${paymentMethod === method.name ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
+                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm cursor-pointer ${paymentMethod === method.name ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide flex items-center gap-2">
                           <span className="text-lg">💳</span> {method.name} {method.integration && method.integration !== 'NONE' ? `- ${method.integration.replace('_', ' ')}` : '- ONLINE'}
@@ -978,12 +1376,15 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     {/* MÉTODOS OFFLINE */}
                     {paymentSettings.filter(p => p.enabled && p.type !== 'ONLINE' && p.integration !== 'MERCADO_PAGO' && p.integration !== 'PAGSEGURO').map(method => (
                       <button 
+                        type="button"
                         key={method.id}
                         onClick={() => {
                           setPaymentMethod(method.name);
-                          scrollToSection(confirmRef);
+                          if (method.name !== 'Dinheiro') {
+                            scrollToSection(confirmRef);
+                          }
                         }}
-                        className={`w-full text-left px-4 py-3 rounded-xl border transition-all flex items-center justify-between ${paymentMethod === method.name ? 'border-red-500 bg-red-50 text-red-800' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200'}`}
+                        className={`w-full text-left px-4 py-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${paymentMethod === method.name ? 'border-red-500 bg-red-50 text-red-800' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-wide">
                           {method.name} 
@@ -997,13 +1398,27 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   </div>
                 )}
                 {paymentMethod === 'Dinheiro' && (
-                  <input 
-                    type="number" 
-                    placeholder="Troco para quanto?" 
-                    value={changeFor || ''} 
-                    onChange={(e) => setChangeFor(Number(e.target.value))}
-                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
-                  />
+                  <div className="space-y-1.5 pt-1 animate-in fade-in">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                      Troco para quanto? (Deixe em branco se não precisar)
+                    </label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="number" 
+                        placeholder="Ex: 50 ou 100" 
+                        value={changeFor || ''} 
+                        onChange={(e) => setChangeFor(Number(e.target.value))}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection(confirmRef)}
+                        className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase rounded-xl cursor-pointer shadow-sm"
+                      >
+                        Avançar
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -1020,31 +1435,36 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
             </div>
 
             <button 
-              onClick={() => {
-                if (!isStoreOpen && !scheduledTime && scheduleAllowed && onOpenScheduleModal) {
-                  onOpenScheduleModal();
-                  return;
-                }
-                handleCheckoutClick();
-              }}
-              disabled={isProcessing || isZipOutOfArea || (!isStoreOpen && !scheduledTime && !scheduleAllowed)}
-              className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
-                isProcessing || isZipOutOfArea || (!isStoreOpen && !scheduledTime && !scheduleAllowed)
-                  ? 'bg-red-300 text-white cursor-not-allowed' 
-                  : (!isStoreOpen && !scheduledTime && scheduleAllowed)
-                    ? 'bg-amber-400 hover:bg-amber-500 text-slate-950 shadow-amber-400/25 cursor-pointer animate-pulse'
-                    : 'bg-white text-red-600 hover:bg-red-50 shadow-red-900/20 cursor-pointer'
+              type="button"
+              onClick={handleCheckoutClick}
+              disabled={isProcessing}
+              className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                isProcessing
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : !isAllOptionsFilled
+                    ? 'bg-amber-400 hover:bg-amber-500 text-amber-950 shadow-amber-400/25 ring-2 ring-amber-500/60'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-950/30 ring-4 ring-emerald-500/30'
               }`}
             >
-              {isProcessing 
-                ? 'Processando...' 
-                : (!isStoreOpen && !scheduledTime && !scheduleAllowed)
-                    ? 'Agendamento Indisponível' 
-                    : (!isStoreOpen && !scheduledTime && scheduleAllowed)
-                        ? '📅 Clique para Agendar Horário' 
-                        : (isZipOutOfArea 
-                            ? 'CEP Fora da Área de Entrega' 
-                            : (scheduledTime ? `Confirmar Agendamento (${scheduledTime})` : 'Confirmar Pedido'))}
+              {isProcessing ? (
+                <span>Processando...</span>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span>{isAllOptionsFilled ? '✓' : '⚠️'}</span>
+                    <span>{scheduledTime ? `Confirmar Agendamento (${scheduledTime})` : 'Confirmar Pedido'}</span>
+                  </div>
+                  {!isAllOptionsFilled ? (
+                    <span className="text-[10px] opacity-90 font-bold lowercase tracking-normal">
+                      (clique para ver opções pendentes)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-emerald-100 font-bold lowercase tracking-normal">
+                      (tudo pronto! clique para finalizar)
+                    </span>
+                  )}
+                </>
+              )}
             </button>
           </div>
         )}

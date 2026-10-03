@@ -103,11 +103,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, cus
                 </div>
                 <input 
                   type="text" 
-                  placeholder="00000-000" 
+                  placeholder="00000-000 (opcional)" 
                   value={zipCode} 
                   onChange={e => handleCepChange(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500" 
-                  required 
                 />
               </div>
 

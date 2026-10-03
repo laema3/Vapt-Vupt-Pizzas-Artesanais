@@ -1745,6 +1745,8 @@ const App: React.FC = () => {
         zipRanges={zipRanges}
         ntfyTopic={ntfyTopic}
         scheduledTime={scheduledTime}
+        orders={orders}
+        onSelectScheduledTime={(time) => setScheduledTime(time)}
         onOpenScheduleModal={() => {
           setCepModalInitialStep('SCHEDULE');
           setIsOpeningCepModalOpen(true);

@@ -255,8 +255,8 @@ const App: React.FC = () => {
   // Fecha o modal de CEP e marca como verificado automaticamente para usuários logados
   useEffect(() => {
     if (currentUser) {
+      safeStorage.setItem('nl_opening_cep_verified', 'true');
       if (currentUser.zipCode) {
-        safeStorage.setItem('nl_opening_cep_verified', 'true');
         safeStorage.setItem('nl_opening_cep', currentUser.zipCode);
       }
       setIsOpeningCepModalOpen(false);
@@ -775,6 +775,25 @@ const App: React.FC = () => {
     return subCategories.filter(s => s.categoryId === currentCat.id).sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedCategory, categories, subCategories]);
 
+  const handleProductClick = (product: Product) => {
+    const isOutOfStock = Boolean(
+      product.outOfStock === true ||
+      (product as any).status === 'ESGOTADO' ||
+      String((product as any).status || '').toUpperCase() === 'ESGOTADO' ||
+      String((product as any).status || '').toUpperCase() === 'OUT_OF_STOCK' ||
+      String((product as any).status || '').toUpperCase() === 'SEM_ESTOQUE' ||
+      (product as any).isOutOfStock === true ||
+      ((product as any).stock !== undefined && (product as any).stock !== null && Number((product as any).stock) <= 0)
+    );
+    if (isOutOfStock) {
+      const msg = `⚠️ O produto "${product.name}" está ESGOTADO no momento. Não é possível prosseguir para a montagem de pedido deste item. Por favor, escolha outro produto ou sabor disponível no nosso cardápio!`;
+      try { alert(msg); } catch (_e) { void _e; }
+      setToast({ show: true, msg, type: 'error' });
+      return;
+    }
+    setSelectedProduct(product);
+  };
+
   const handleAddToCart = (
     product: Product, 
     quantity: number, 
@@ -789,6 +808,21 @@ const App: React.FC = () => {
       selectedAdditionals?: Complement[];
     }
   ) => {
+    const isOutOfStock = Boolean(
+      product.outOfStock === true ||
+      (product as any).status === 'ESGOTADO' ||
+      String((product as any).status || '').toUpperCase() === 'ESGOTADO' ||
+      String((product as any).status || '').toUpperCase() === 'OUT_OF_STOCK' ||
+      String((product as any).status || '').toUpperCase() === 'SEM_ESTOQUE' ||
+      (product as any).isOutOfStock === true ||
+      ((product as any).stock !== undefined && (product as any).stock !== null && Number((product as any).stock) <= 0)
+    );
+    if (isOutOfStock) {
+      const msg = `⚠️ O produto "${product.name}" está ESGOTADO e não pode ser adicionado ao pedido!`;
+      try { alert(msg); } catch (_e) { void _e; }
+      setToast({ show: true, msg, type: 'error' });
+      return;
+    }
     const compsPrice = comps?.reduce((acc, c) => acc + (c.price || 0), 0) || 0;
     
     let itemName = product.name;
@@ -1665,7 +1699,16 @@ const App: React.FC = () => {
             <div className="w-full max-w-7xl mx-auto px-6 py-12">
                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                   {groupedMenu.length > 0 ? (
-                    groupedMenu.map(p => <FoodCard key={p.id} product={p} onAdd={handleAddToCart} onClick={setSelectedProduct} logoUrl={logoUrl} />)
+                    groupedMenu.map(p => (
+                      <FoodCard 
+                        key={p.id} 
+                        product={p} 
+                        onAdd={handleAddToCart} 
+                        onClick={handleProductClick} 
+                        logoUrl={logoUrl} 
+                        onShowToast={(msg, type) => setToast({ show: true, msg, type })}
+                      />
+                    ))
                   ) : (
                     <div className="col-span-full py-20 text-center flex flex-col items-center gap-4">
                         <span className="opacity-50 font-black uppercase tracking-widest">
@@ -1774,7 +1817,10 @@ const App: React.FC = () => {
       />
       <OpeningCepModal
         isOpen={isOpeningCepModalOpen}
-        onClose={() => setIsOpeningCepModalOpen(false)}
+        onClose={() => {
+          safeStorage.setItem('nl_opening_cep_verified', 'true');
+          setIsOpeningCepModalOpen(false);
+        }}
         currentUser={currentUser}
         zipRanges={zipRanges}
         orders={orders}

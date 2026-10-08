@@ -90,6 +90,12 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(
     forcedDeliveryType || (defaultTableId ? 'TABLE' : (currentUser ? 'DELIVERY' : null))
   );
+  const [isDeliveryConfirmed, setIsDeliveryConfirmed] = useState<boolean>(() => {
+    if (defaultTableId) return true;
+    if (forcedDeliveryType === 'PICKUP') return true;
+    if (currentUser && Boolean((currentUser.address || '').trim())) return true;
+    return false;
+  });
   const [selectedTableId, setSelectedTableId] = useState<string>(defaultTableId || '');
   const [orderObservations, setOrderObservations] = useState('');
   const [isObservationsConfirmed, setIsObservationsConfirmed] = useState(false);
@@ -164,6 +170,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         setStreet(parts.street);
         setNumber(parts.number);
         setComplement(parts.complement);
+        setIsDeliveryConfirmed(true);
       }
       if (currentUser.neighborhood) setNeighborhood(currentUser.neighborhood);
       if (!forcedDeliveryType && !defaultTableId) {
@@ -334,6 +341,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
   const isAllOptionsFilled = Boolean(
     deliveryType && 
+    isDeliveryConfirmed &&
     isAddressFilled && 
     isScheduleSelected && 
     isCouponSelected && 
@@ -417,20 +425,56 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   };
 
   const handleCheckoutClick = () => {
+    const missingItems: string[] = [];
+    let firstPendingRef: React.RefObject<HTMLDivElement | null> | null = null;
+
     // 1. Validação de horário no agendamento
     if (isSchedulingRequired && !scheduledTime) {
-      const msg = '⚠️ Favor selecionar o horário do agendamento para continuar.';
-      alert(msg);
-      if (onShowToast) onShowToast(msg, 'error');
-      setIsSchedulingOpen(true);
-      scrollToSection(scheduleRef);
+      missingItems.push('Horário de Agendamento');
+      if (!firstPendingRef) firstPendingRef = scheduleRef;
+    }
+
+    // 2. Tipo e confirmação de entrega
+    if (!deliveryType || !isDeliveryConfirmed) {
+      missingItems.push('Tipo de Entrega e Confirmação de Endereço');
+      if (!firstPendingRef) firstPendingRef = deliveryRef;
+    }
+
+    // 3. Cupom de desconto
+    if (!appliedCoupon && !isCouponConfirmed) {
+      missingItems.push('Cupom de Desconto (aplique o cupom ou clique em "Não tenho cupom")');
+      if (!firstPendingRef) firstPendingRef = couponRef;
+    }
+
+    // 4. Observações do pedido
+    if (!isObservationsConfirmed && !orderObservations.trim()) {
+      missingItems.push('Observações do Pedido (salve suas instruções ou clique em "Sem Observações")');
+      if (!firstPendingRef) firstPendingRef = observationsRef;
+    }
+
+    // 5. Forma de pagamento
+    if (!paymentMethod) {
+      missingItems.push('Forma de Pagamento (Pix, Cartão ou Dinheiro)');
+      if (!firstPendingRef) firstPendingRef = paymentRef;
+    }
+
+    if (missingItems.length > 0) {
+      const msg = `⚠️ Favor preencher e confirmar todas as opções antes de concluir o agendamento/pedido:\n\n• ${missingItems.join('\n• ')}`;
+      try {
+        alert(msg);
+      } catch (_e) { void _e; }
+      if (onShowToast) onShowToast(`⚠️ Opção pendente: ${missingItems[0]}`, 'error');
+      if (firstPendingRef) {
+        if (firstPendingRef === scheduleRef) setIsSchedulingOpen(true);
+        scrollToSection(firstPendingRef);
+      }
       return;
     }
 
     // 2. Tipo de entrega
     if (!deliveryType) {
       const msg = '⚠️ Favor selecionar a forma de entrega (Delivery ou Retirada).';
-      alert(msg);
+      try { alert(msg); } catch (_e) { void _e; }
       if (onShowToast) onShowToast(msg, 'error');
       scrollToSection(deliveryRef);
       return;
@@ -910,6 +954,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                         type="button"
                         onClick={() => {
                           setDeliveryType('PICKUP');
+                          setIsDeliveryConfirmed(true);
+                          if (onShowToast) onShowToast('Retirada no Balcão selecionada!', 'success');
                           scrollToSection(couponRef);
                         }} 
                         className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm cursor-pointer ${deliveryType === 'PICKUP' ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
@@ -922,6 +968,32 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                     </>
                   )}
                 </div>
+
+                {deliveryType === 'PICKUP' && (
+                  <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl space-y-2 mt-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-emerald-800 uppercase flex items-center gap-1.5">
+                        <span>🛍️</span> Retirada no Balcão
+                      </span>
+                      <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full uppercase">
+                        Confirmado • Sem Frete
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-700 font-medium">
+                      Você irá retirar seu pedido diretamente em nosso balcão quando estiver pronto.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDeliveryConfirmed(true);
+                        scrollToSection(couponRef);
+                      }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2 rounded-xl uppercase tracking-wider transition-colors cursor-pointer shadow-sm"
+                    >
+                      ✓ Confirmar Retirada e Ir para Cupom →
+                    </button>
+                  </div>
+                )}
 
                 {deliveryType === 'DELIVERY' && (
                   <div ref={addressRef} className="bg-white p-4 rounded-2xl border border-red-200 space-y-3 mt-3 shadow-sm">
@@ -950,23 +1022,36 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                         </div>
 
                         {!isEditingAddress ? (
-                          <div className="pt-2 border-t border-red-100 flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-black text-slate-900 text-xs">
-                                📍 {street ? `${street}${number ? `, ${number}` : ''}${complement ? ` - ${complement}` : ''}` : (currentUser.address || 'Endereço cadastrado')}
-                              </p>
-                              {(neighborhood || currentUser.neighborhood) && (
-                                <p className="text-[10px] font-bold text-slate-500 truncate">
-                                  {neighborhood || currentUser.neighborhood}
+                          <div className="pt-2 border-t border-red-100 flex flex-col gap-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-black text-slate-900 text-xs">
+                                  📍 {street ? `${street}${number ? `, ${number}` : ''}${complement ? ` - ${complement}` : ''}` : (currentUser.address || 'Endereço cadastrado')}
                                 </p>
-                              )}
+                                {(neighborhood || currentUser.neighborhood) && (
+                                  <p className="text-[10px] font-bold text-slate-500 truncate">
+                                    {neighborhood || currentUser.neighborhood}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingAddress(true)}
+                                className="text-[10px] font-black text-red-600 hover:text-red-800 underline uppercase cursor-pointer shrink-0"
+                              >
+                                Alterar
+                              </button>
                             </div>
                             <button
                               type="button"
-                              onClick={() => setIsEditingAddress(true)}
-                              className="text-[10px] font-black text-red-600 hover:text-red-800 underline uppercase cursor-pointer shrink-0"
+                              onClick={() => {
+                                setIsDeliveryConfirmed(true);
+                                if (onShowToast) onShowToast('Endereço confirmado com sucesso!', 'success');
+                                scrollToSection(couponRef);
+                              }}
+                              className="w-full mt-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2.5 rounded-xl uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                             >
-                              Alterar
+                              <span>✓ Confirmar Endereço e Ir para Cupom →</span>
                             </button>
                           </div>
                         ) : (
@@ -1046,12 +1131,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                             <button
                               type="button"
                               onClick={() => {
+                                if (!street.trim() || !number.trim() || !neighborhood.trim()) {
+                                  const msg = '⚠️ Favor preencher Rua, Número e Bairro do endereço.';
+                                  try { alert(msg); } catch (_e) { void _e; }
+                                  if (onShowToast) onShowToast(msg, 'error');
+                                  return;
+                                }
                                 setIsEditingAddress(false);
+                                setIsDeliveryConfirmed(true);
+                                if (onShowToast) onShowToast('Endereço atualizado com sucesso!', 'success');
                                 scrollToSection(couponRef);
                               }}
-                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded-xl uppercase tracking-wider transition-colors cursor-pointer"
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2.5 rounded-xl uppercase tracking-wider transition-colors cursor-pointer shadow-sm"
                             >
-                              ✓ Salvar Endereço e Avançar
+                              ✓ Salvar Endereço e Ir para Cupom →
                             </button>
                           </div>
                         )}
@@ -1165,14 +1258,22 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                           type="button"
                           onClick={() => {
                             if (!guestName.trim() || !guestPhone.trim() || !zipCode || !street.trim() || !number.trim() || !neighborhood.trim()) {
-                              const msg = '⚠️ Favor preencher todos os dados de entrega obrigatórios.';
-                              alert(msg);
+                              const msg = '⚠️ Favor preencher todos os dados de entrega obrigatórios (Nome, WhatsApp, CEP, Rua, Número e Bairro).';
+                              try { alert(msg); } catch (_e) { void _e; }
                               if (onShowToast) onShowToast(msg, 'error');
                               return;
                             }
+                            if (zipRanges.length > 0 && !zipCoverage.isCovered) {
+                              const msg = `⚠️ O CEP ${zipCode} está fora da nossa área de entrega cadastrada. Favor alterar para Retirada no Balcão.`;
+                              try { alert(msg); } catch (_e) { void _e; }
+                              if (onShowToast) onShowToast(msg, 'error');
+                              return;
+                            }
+                            setIsDeliveryConfirmed(true);
+                            if (onShowToast) onShowToast('Endereço confirmado com sucesso!', 'success');
                             scrollToSection(couponRef);
                           }}
-                          className="w-full bg-slate-900 hover:bg-slate-950 text-white font-black text-xs py-2.5 rounded-xl uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                          className="w-full bg-slate-900 hover:bg-slate-950 text-white font-black text-xs py-2.5 rounded-xl uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                         >
                           <span>✓ Confirmar Endereço e Ir para Cupom →</span>
                         </button>
@@ -1262,91 +1363,202 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   </div>
                 )}
               </div>
-              {/* Seção Cupom de Desconto */}
-              <div ref={couponRef} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cupom de Desconto</h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCouponConfirmed(true);
-                      scrollToSection(observationsRef);
-                    }}
-                    className="text-[10px] font-bold text-slate-500 hover:text-slate-800 underline cursor-pointer"
-                  >
-                    Não tenho cupom →
-                  </button>
+              {/* Seção Cupom de Desconto - SUPER DESTACADA COM COR DIFERENCIADA */}
+              <div 
+                ref={couponRef} 
+                className="space-y-3.5 p-4 rounded-2xl bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900 text-white border-2 border-amber-400 shadow-xl shadow-purple-950/40 relative overflow-hidden transition-all duration-300"
+              >
+                {/* Efeito visual decorativo */}
+                <div className="absolute -right-8 -bottom-8 w-28 h-28 bg-amber-400/10 rounded-full blur-xl pointer-events-none" />
+
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-amber-400 text-slate-950 text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-sm tracking-wider">
+                      🏷️ DESTAQUE
+                    </span>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-amber-300 drop-shadow-sm">
+                      Cupom de Desconto
+                    </h3>
+                  </div>
+                  {appliedCoupon ? (
+                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/80 border border-emerald-400/50 px-2 py-0.5 rounded-full">
+                      ✓ Ativo: {appliedCoupon.code}
+                    </span>
+                  ) : isCouponConfirmed ? (
+                    <span className="text-[10px] font-bold text-slate-300 bg-white/10 px-2 py-0.5 rounded-full border border-white/20">
+                      ✓ Sem cupom
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-black text-amber-300 bg-amber-950/80 border border-amber-400/50 px-2 py-0.5 rounded-full animate-pulse">
+                      ⚠️ Confirmação obrigatória
+                    </span>
+                  )}
                 </div>
+
+                <p className="text-[11px] text-purple-200/90 leading-tight font-medium">
+                  Aproveite para economizar! Digite seu cupom ou confirme a opção sem cupom para avançar.
+                </p>
+
                 <div className="flex gap-2">
                   <input 
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="CÓDIGO DO CUPOM"
-                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 uppercase"
+                    placeholder="DIGITE SEU CUPOM"
+                    className="flex-1 bg-white text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-black placeholder:text-slate-400 focus:ring-2 focus:ring-amber-400 focus:outline-none uppercase tracking-wider shadow-inner"
                   />
                   <button 
                     type="button"
                     onClick={handleApplyCoupon}
-                    className="bg-red-600 text-white px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors cursor-pointer"
+                    className="bg-amber-400 hover:bg-amber-300 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-md shadow-amber-950/30"
                   >
                     Aplicar
                   </button>
                 </div>
-                {appliedCoupon ? (
-                  <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">✅ Cupom {appliedCoupon.code} aplicado com sucesso!</p>
-                ) : isCouponConfirmed ? (
-                  <p className="text-[11px] font-bold text-slate-400">✓ Opção sem cupom confirmada</p>
-                ) : null}
+
+                {appliedCoupon && (
+                  <div className="bg-emerald-500/20 border border-emerald-400/40 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-300 flex items-center gap-1">
+                      🎉 Cupom <strong>{appliedCoupon.code}</strong> aplicado (-R$ {discount.toFixed(2)})!
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        setCouponCode('');
+                        setIsCouponConfirmed(false);
+                      }}
+                      className="text-[10px] text-red-300 hover:text-red-100 underline font-bold cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-purple-800/80 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!deliveryType || !isDeliveryConfirmed) {
+                        const msg = '⚠️ Favor confirmar o tipo e endereço de entrega antes de avançar do cupom.';
+                        try { alert(msg); } catch (_e) { void _e; }
+                        if (onShowToast) onShowToast(msg, 'error');
+                        scrollToSection(deliveryRef);
+                        return;
+                      }
+                      setAppliedCoupon(null);
+                      setIsCouponConfirmed(true);
+                      if (onShowToast) onShowToast('Opção sem cupom confirmada!', 'success');
+                      scrollToSection(observationsRef);
+                    }}
+                    className={`flex-1 py-2.5 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                      isCouponConfirmed && !appliedCoupon
+                        ? 'bg-purple-800/90 text-white border-amber-400'
+                        : 'bg-white/10 hover:bg-white/20 text-purple-100 border-white/20'
+                    }`}
+                  >
+                    <span>🚫 Continuar Sem Cupom</span>
+                    <span>→</span>
+                  </button>
+
+                  {appliedCoupon && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCouponConfirmed(true);
+                        scrollToSection(observationsRef);
+                      }}
+                      className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md"
+                    >
+                      <span>✓ Confirmar Cupom e Avançar</span>
+                      <span>→</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Seção Observações do Pedido */}
-              <div ref={observationsRef} className="space-y-3">
+              <div ref={observationsRef} className="space-y-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Observações do Pedido</h3>
-                  {isObservationsConfirmed && (
-                    <span className="text-[10px] font-bold text-emerald-600">✓ Confirmado</span>
+                  <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                    <span>📝</span> Observações do Pedido
+                  </h3>
+                  {isObservationsConfirmed ? (
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      ✓ Confirmado {orderObservations.trim() ? '(com notas)' : '(sem notas)'}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      ⚠️ Confirmação obrigatória
+                    </span>
                   )}
                 </div>
                 <div className="space-y-2">
                   <textarea 
                     value={orderObservations}
-                    onChange={(e) => setOrderObservations(e.target.value)}
-                    placeholder="Ex: Sem cebola, caprichar no molho, campainha quebrada..."
+                    onChange={(e) => {
+                      setOrderObservations(e.target.value);
+                      setIsObservationsConfirmed(false);
+                    }}
+                    placeholder="Ex: Sem cebola, caprichar no orégano, ponto da massa bem assada..."
                     rows={2}
-                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 resize-none shadow-sm"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500 outline-none resize-none"
                   />
                   <div className="flex gap-2">
                     <button 
                       type="button"
                       onClick={() => {
+                        if (!isCouponConfirmed && !appliedCoupon) {
+                          const msg = '⚠️ Favor confirmar o Cupom de Desconto antes de avançar as observações.';
+                          try { alert(msg); } catch (_e) { void _e; }
+                          if (onShowToast) onShowToast(msg, 'error');
+                          scrollToSection(couponRef);
+                          return;
+                        }
                         setOrderObservations('');
                         setIsObservationsConfirmed(true);
+                        if (onShowToast) onShowToast('Confirmado sem observações!', 'success');
                         scrollToSection(paymentRef);
                       }}
-                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 border border-slate-200"
                     >
                       <span>🚫 Sem Observações</span>
                     </button>
                     <button 
                       type="button"
                       onClick={() => {
+                        if (!isCouponConfirmed && !appliedCoupon) {
+                          const msg = '⚠️ Favor confirmar o Cupom de Desconto antes de avançar as observações.';
+                          try { alert(msg); } catch (_e) { void _e; }
+                          if (onShowToast) onShowToast(msg, 'error');
+                          scrollToSection(couponRef);
+                          return;
+                        }
                         setIsObservationsConfirmed(true);
+                        if (onShowToast) onShowToast(orderObservations.trim() ? 'Observações salvas!' : 'Confirmado sem observações!', 'success');
                         scrollToSection(paymentRef);
                       }}
-                      className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                      className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-950 text-white rounded-xl font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-sm active:scale-95"
                     >
-                      <span>Ir para Pagamento →</span>
+                      <span>✓ Salvar e Ir para Pagamento →</span>
                     </button>
                   </div>
                 </div>
               </div>
 
               {/* Seção Pagamento */}
-              <div ref={paymentRef} className="space-y-3">
+              <div ref={paymentRef} className="space-y-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Pagamento</h3>
-                  {paymentMethod && (
-                    <span className="text-[10px] font-bold text-emerald-600">✓ {paymentMethod}</span>
+                  <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                    <span>💳</span> Forma de Pagamento
+                  </h3>
+                  {paymentMethod ? (
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      ✓ {paymentMethod}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      ⚠️ Seleção obrigatória
+                    </span>
                   )}
                 </div>
                 {deliveryType === 'TABLE' ? (
@@ -1361,7 +1573,15 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                         type="button"
                         key={method.id}
                         onClick={() => {
+                          if (!isObservationsConfirmed && !orderObservations.trim()) {
+                            const msg = '⚠️ Favor confirmar as Observações do pedido antes de escolher o pagamento.';
+                            try { alert(msg); } catch (_e) { void _e; }
+                            if (onShowToast) onShowToast(msg, 'error');
+                            scrollToSection(observationsRef);
+                            return;
+                          }
                           setPaymentMethod(method.name);
+                          if (onShowToast) onShowToast(`Pagamento selecionado: ${method.name}`, 'success');
                           scrollToSection(confirmRef);
                         }}
                         className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between shadow-sm cursor-pointer ${paymentMethod === method.name ? 'border-red-500 bg-red-50 text-red-700 shadow-red-100' : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:text-red-500'}`}
@@ -1379,8 +1599,16 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                         type="button"
                         key={method.id}
                         onClick={() => {
+                          if (!isObservationsConfirmed && !orderObservations.trim()) {
+                            const msg = '⚠️ Favor confirmar as Observações do pedido antes de escolher o pagamento.';
+                            try { alert(msg); } catch (_e) { void _e; }
+                            if (onShowToast) onShowToast(msg, 'error');
+                            scrollToSection(observationsRef);
+                            return;
+                          }
                           setPaymentMethod(method.name);
                           if (method.name !== 'Dinheiro') {
+                            if (onShowToast) onShowToast(`Pagamento selecionado: ${method.name}`, 'success');
                             scrollToSection(confirmRef);
                           }
                         }}

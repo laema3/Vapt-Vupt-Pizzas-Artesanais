@@ -142,6 +142,24 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   useEffect(() => {
     if (product) {
+      const isOutOfStock = Boolean(
+        product.outOfStock === true ||
+        (product as any).status === 'ESGOTADO' ||
+        String((product as any).status || '').toUpperCase() === 'ESGOTADO' ||
+        String((product as any).status || '').toUpperCase() === 'OUT_OF_STOCK' ||
+        String((product as any).status || '').toUpperCase() === 'SEM_ESTOQUE' ||
+        (product as any).isOutOfStock === true ||
+        ((product as any).stock !== undefined && (product as any).stock !== null && Number((product as any).stock) <= 0)
+      );
+
+      if (isOutOfStock) {
+        try {
+          alert(`⚠️ O produto "${product.name}" está ESGOTADO no momento. Não é possível prosseguir para montagem de pedido deste produto.`);
+        } catch (_e) { void _e; }
+        onClose();
+        return;
+      }
+
       setQuantity(1);
       setBordaSelection(null);
       setSelectedAdicionais([]);
@@ -150,7 +168,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setFlavorSearch('');
       setBordaHighlightAlert(false);
     }
-  }, [product]);
+  }, [product, onClose]);
 
   // Identifica se o produto atual é uma pizza
   const isPizza = useMemo(() => checkIfProductIsPizza(product, categories), [product, categories]);
@@ -193,7 +211,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     if (!isPizza || !product || !allProducts || allProducts.length === 0) return [];
     return allProducts.filter(p => {
       if (p.id === product.id) return false;
-      if (p.hidden || p.outOfStock) return false;
+      const isOut = Boolean(
+        p.outOfStock === true ||
+        (p as any).status === 'ESGOTADO' ||
+        String((p as any).status || '').toUpperCase() === 'ESGOTADO' ||
+        String((p as any).status || '').toUpperCase() === 'OUT_OF_STOCK' ||
+        String((p as any).status || '').toUpperCase() === 'SEM_ESTOQUE' ||
+        (p as any).isOutOfStock === true ||
+        ((p as any).stock !== undefined && (p as any).stock !== null && Number((p as any).stock) <= 0)
+      );
+      if (p.hidden || isOut) return false;
       if (!checkIfProductIsPizza(p, categories)) return false;
 
       if (flavorSearch.trim()) {

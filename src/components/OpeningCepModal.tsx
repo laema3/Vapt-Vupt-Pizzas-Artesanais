@@ -232,9 +232,12 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
         {onClose && (
           <button 
             type="button" 
-            onClick={onClose} 
+            onClick={() => {
+              safeStorage.setItem('nl_opening_cep_verified', 'true');
+              onClose();
+            }} 
             className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center font-bold text-lg transition-colors cursor-pointer"
-            title="Fechar"
+            title="Fechar e ver cardápio"
           >
             ✕
           </button>
@@ -407,13 +410,26 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
               )}
 
               {!result.checked && (
-                <div className="pt-2 border-t border-slate-100 text-center">
+                <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2">
                   <button
+                    type="button"
                     onClick={handlePickupChoice}
-                    className="text-xs font-bold uppercase text-slate-500 hover:text-red-600 transition-colors py-2 px-4 rounded-lg hover:bg-slate-50 cursor-pointer inline-flex items-center gap-1.5"
+                    className="text-xs font-bold uppercase text-slate-500 hover:text-red-600 transition-colors py-2 px-3 rounded-lg hover:bg-slate-50 cursor-pointer inline-flex items-center gap-1.5"
                   >
-                    <span>🛍️ Prefiro Retirar no Balcão (Sem Consulta de CEP)</span>
+                    <span>🛍️ Retirar no Balcão</span>
                   </button>
+                  {onClose && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        safeStorage.setItem('nl_opening_cep_verified', 'true');
+                        onClose();
+                      }}
+                      className="text-xs font-black uppercase text-red-600 hover:text-red-700 transition-colors py-2 px-3 rounded-lg hover:bg-red-50 cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <span>🍽️ Ver Cardápio Primeiro →</span>
+                    </button>
+                  )}
                 </div>
               )}
             </>

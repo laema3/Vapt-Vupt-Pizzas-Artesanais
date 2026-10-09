@@ -231,32 +231,32 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     return Boolean(isPizza && checkIfProductIsSweetPizza(product, categories));
   }, [isPizza, product, categories]);
 
-  // Separar Bordas e Adicionais aplicáveis (BORDAS PARA TODAS AS PIZZAS, INCLUINDO DOCES)
+  // Separar Bordas e Adicionais aplicáveis (BORDAS EXCLUSIVAS PARA PIZZAS SALGADAS - DOCES NÃO TÊM BORDA)
   const applicableComplements = useMemo(() => {
     if (!product || !complements) return [];
     return complements.filter(c => {
       if (!c.active) return false;
       const isBordaComp = c.type === 'BORDA' || c.name.toLowerCase().includes('borda');
-      // Bordas NUNCA são aplicáveis se o produto não for pizza!
-      if (isBordaComp && !isPizza) return false;
+      // Bordas NUNCA são aplicáveis se o produto não for pizza ou se for pizza doce!
+      if (isBordaComp && (!isPizza || isSweetPizza)) return false;
 
-      // Se não houver restrição específica de categorias, aplica para todas as pizzas
+      // Se não houver restrição específica de categorias, aplica para as pizzas
       if (!c.applicable_categories || c.applicable_categories.length === 0) {
         return true;
       }
       return c.applicable_categories.includes(product.category) || 
              c.applicable_categories.includes(product.id);
     });
-  }, [product, complements, isPizza]);
+  }, [product, complements, isPizza, isSweetPizza]);
 
   const bordaItems = useMemo(() => {
-    // Bordas são estritamente exclusivas para pizzas (salgadas e doces)
-    if (!isPizza) return [];
+    // Bordas são estritamente exclusivas para pizzas salgadas (pizzas doces NÃO têm opção de borda)
+    if (!isPizza || isSweetPizza) return [];
     const list = applicableComplements.filter(c => 
       c.type === 'BORDA' || c.name.toLowerCase().includes('borda')
     );
     return list;
-  }, [applicableComplements, isPizza]);
+  }, [applicableComplements, isPizza, isSweetPizza]);
 
   const adicionalItems = useMemo(() => {
     const list = applicableComplements.filter(c => 
@@ -266,9 +266,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   }, [applicableComplements]);
 
   // Lista de outros sabores de pizza disponíveis para a segunda metade
-  // REGRA: Se for pizza doce, aceita apenas outras pizzas doces! Se for salgada, aceita apenas outras salgadas!
+  // (Apenas para pizzas salgadas no meio a meio, excluindo doces e itens fora de estoque)
   const availableSecondFlavors = useMemo(() => {
-    if (!isPizza || !product || !allProducts || allProducts.length === 0) return [];
+    if (!isPizza || isSweetPizza || !product || !allProducts || allProducts.length === 0) return [];
     return allProducts.filter(p => {
       if (p.id === product.id) return false;
       const isOut = Boolean(
@@ -283,13 +283,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       if (p.hidden || isOut) return false;
       if (!checkIfProductIsPizza(p, categories)) return false;
 
-      // REGRA SOLICITADA: Pizza doce apenas com doce; Pizza salgada apenas com salgada
-      const pIsSweet = checkIfProductIsSweetPizza(p, categories);
-      if (isSweetPizza) {
-        if (!pIsSweet) return false;
-      } else {
-        if (pIsSweet) return false;
-      }
+      // Pizzas doces não têm meio a meio
+      if (checkIfProductIsSweetPizza(p, categories)) return false;
 
       if (flavorSearch.trim()) {
         const query = flavorSearch.toLowerCase().trim();
@@ -303,11 +298,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   // Objeto de borda efetivo (se 'NONE', vira objeto sem_borda com price: 0)
   const effectiveBorda: Complement | null = useMemo(() => {
-    if (!isPizza) return null;
+    if (!isPizza || isSweetPizza) return null;
     if (bordaSelection === 'NONE') return NO_BORDA_COMPLEMENT;
     if (bordaSelection && typeof bordaSelection === 'object') return bordaSelection;
     return null;
-  }, [isPizza, bordaSelection]);
+  }, [isPizza, isSweetPizza, bordaSelection]);
 
   // Lista combinada de complementos para salvar no pedido
   const selectedComplements = useMemo(() => {
@@ -317,8 +312,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     ];
   }, [effectiveBorda, selectedAdicionais]);
 
-  // Regra de obrigatoriedade da borda (EXCLUSIVA para pizzas com bordas cadastradas)
-  const isBordaMandatory = Boolean(isPizza && bordaItems.length > 0);
+  // Regra de obrigatoriedade da borda (EXCLUSIVA para pizzas salgadas com bordas cadastradas)
+  const isBordaMandatory = Boolean(isPizza && !isSweetPizza && bordaItems.length > 0);
   const hasBordaDecision = !isBordaMandatory || bordaSelection !== null;
 
   // Seleção de Borda: Apenas 1 borda. Ao escolher uma, as demais ficam desabilitadas.
@@ -376,7 +371,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const secondHalfPrice = selectedSecondFlavor ? (selectedSecondFlavor.price / 2) : 0;
 
   // Preço base da pizza
-  const calculatedBasePrice = (isPizza && pizzaMode === 'MEIO_A_MEIO')
+  const calculatedBasePrice = (isPizza && !isSweetPizza && pizzaMode === 'MEIO_A_MEIO')
     ? (selectedSecondFlavor ? (firstHalfPrice + secondHalfPrice) : product.price)
     : product.price;
 
@@ -387,17 +382,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   const canAddToCart = () => {
     if ((!isStoreOpen && !scheduleAllowed) || product.outOfStock) return false;
-    if (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) return false;
-    if (isPizza && !hasBordaDecision) return false;
+    if (isPizza && !isSweetPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) return false;
+    if (isPizza && !isSweetPizza && !hasBordaDecision) return false;
     return true;
   };
 
   const handleConfirmAdd = () => {
-    if (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) {
+    if (isPizza && !isSweetPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor) {
       scrollToSection(secondFlavorSectionRef);
       return;
     }
-    if (isPizza && !hasBordaDecision) {
+    if (isPizza && !isSweetPizza && !hasBordaDecision) {
       setBordaHighlightAlert(true);
       scrollToSection(bordaSectionRef);
       return;
@@ -408,13 +403,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       product, 
       quantity, 
       selectedComplements, 
-      isPizza ? {
+      (isPizza && !isSweetPizza) ? {
         mode: pizzaMode,
         secondFlavor: selectedSecondFlavor || undefined,
         calculatedBasePrice
       } : undefined,
       {
-        selectedBorda: isPizza ? (effectiveBorda || undefined) : undefined,
+        selectedBorda: (isPizza && !isSweetPizza) ? (effectiveBorda || undefined) : undefined,
         selectedAdditionals: selectedAdicionais.length > 0 ? selectedAdicionais : undefined,
       }
     );
@@ -454,7 +449,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                         ? 'bg-pink-100 text-pink-700 border border-pink-200' 
                         : 'bg-amber-100 text-amber-800 border border-amber-200'
                     }`}>
-                      {isSweetPizza ? '🍫 Pizza Doce' : '🍕 Pizza Salgada'}
+                      {isSweetPizza ? '🍫 Pizza Doce • Unidade Individual' : '🍕 Pizza Salgada'}
                     </span>
                   </div>
                 )}
@@ -471,8 +466,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </p>
           </div>
 
-          {/* Pizza Mode Selector: INTEIRA ou MEIO A MEIO */}
-          {isPizza && (
+          {/* Banner de Pizza Doce (Venda Individual / Unidade Única) */}
+          {isSweetPizza && (
+            <div className="bg-pink-50 border border-pink-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🍫</span>
+                <div>
+                  <h4 className="font-black text-xs uppercase tracking-tight text-pink-950">
+                    Pizza Doce Individual
+                  </h4>
+                  <p className="text-[11px] text-pink-800 font-medium mt-0.5">
+                    Vendida por unidade inteira (sem opção meio a meio e sem borda recheada).
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-black bg-pink-200 text-pink-900 px-2.5 py-1 rounded-full uppercase shrink-0">
+                1 Unidade
+              </span>
+            </div>
+          )}
+
+          {/* Pizza Mode Selector: INTEIRA ou MEIO A MEIO (Apenas para Pizzas Salgadas) */}
+          {isPizza && !isSweetPizza && (
             <div className="space-y-3 pt-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">
                 Escolha o Formato da Pizza:
@@ -555,8 +570,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </div>
           )}
 
-          {/* Se for MEIO A MEIO, abre a seleção do segundo sabor */}
-          {isPizza && pizzaMode === 'MEIO_A_MEIO' && (
+          {/* Se for MEIO A MEIO, abre a seleção do segundo sabor (Apenas Pizzas Salgadas) */}
+          {isPizza && !isSweetPizza && pizzaMode === 'MEIO_A_MEIO' && (
             <div ref={secondFlavorSectionRef} className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
               
               {/* Informativo da regra de combinação meio a meio */}
@@ -758,8 +773,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </div>
           )}
 
-          {/* Bordas Recheadas (Exclusivo para Pizzas: 1 Borda Recheada OU SEM BORDA) */}
-          {isPizza && bordaItems.length > 0 && (
+          {/* Bordas Recheadas (Exclusivo para Pizzas Salgadas: 1 Borda Recheada OU SEM BORDA) */}
+          {isPizza && !isSweetPizza && bordaItems.length > 0 && (
             <div 
               ref={bordaSectionRef} 
               className={`space-y-3 pt-4 border-t border-slate-100 transition-all rounded-2xl ${
@@ -1078,11 +1093,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 ? 'Produto Esgotado' 
                 : (!isStoreOpen && !scheduleAllowed)
                 ? 'Loja Fechada'
-                : (isPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor)
+                : (isPizza && !isSweetPizza && pizzaMode === 'MEIO_A_MEIO' && !selectedSecondFlavor)
                 ? 'Escolha o 2º Sabor para Continuar'
-                : (isPizza && isBordaMandatory && bordaSelection === null)
+                : (isPizza && !isSweetPizza && isBordaMandatory && bordaSelection === null)
                 ? '⚠️ Escolha a Borda (ou Sem Borda)'
-                : (isPizza && pizzaMode === 'MEIO_A_MEIO')
+                : (isPizza && !isSweetPizza && pizzaMode === 'MEIO_A_MEIO')
                 ? `Adicionar Meio a Meio • R$ ${totalPrice.toFixed(2)}`
                 : `Adicionar ao Pedido • R$ ${totalPrice.toFixed(2)}`
               }

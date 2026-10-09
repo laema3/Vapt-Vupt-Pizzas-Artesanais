@@ -38,8 +38,53 @@ const NO_BORDA_COMPLEMENT: Complement = {
   type: 'BORDA',
 };
 
-// Identifica de forma rigorosa se um produto é uma pizza
-const checkIfProductIsPizza = (product: Product | null | undefined, categories: CategoryItem[] = []): boolean => {
+// Identifica se um produto é uma pizza doce
+const checkIfProductIsSweetPizza = (
+  product: Product | null | undefined, 
+  categories: CategoryItem[] = []
+): boolean => {
+  if (!product) return false;
+  const name = (product.name || '').toLowerCase().trim();
+  const cat = (product.category || '').toLowerCase().trim();
+  const sub = (product.subCategory || '').toLowerCase().trim();
+  const desc = (product.description || '').toLowerCase().trim();
+
+  // Localiza objeto da categoria
+  const catObj = categories.find(c => 
+    c.id === product.category || 
+    c.name.toLowerCase().trim() === cat
+  );
+  const categoryName = (catObj?.name || product.category || '').toLowerCase().trim();
+
+  // Categorias ou subcategorias explícitas de doces
+  const sweetCategoryKeywords = ['doce', 'doces', 'sweet', 'sobremesa', 'sobremesas'];
+  if (sweetCategoryKeywords.some(kw => categoryName.includes(kw) || sub.includes(kw))) {
+    return true;
+  }
+
+  // Palavras-chave inequívocas de sabores doces
+  const sweetKeywords = [
+    'doce', 'doces', 'chocolate', 'nutella', 'ninho', 'brigadeiro',
+    'morango', 'banana', 'romeu e julieta', 'romeu & julieta', 'goiabada',
+    'churros', 'prestígio', 'prestigio', 'sensação', 'sensacao',
+    'confete', 'm&m', 'm&ms', 'kit kat', 'kitkat', 'ovomaltine',
+    'beijinho', 'doce de leite', 'marshmallow', 'oreo', 'ouro branco',
+    'sonho de valsa', 'maracujá', 'maracuja', 'limão', 'limao',
+    'coco com leite condensado', 'banana com canela', 'abacaxi', 'paçoca', 'pacoca', 'brownie'
+  ];
+
+  if (sweetKeywords.some(kw => name.includes(kw) || desc.includes(kw))) {
+    return true;
+  }
+
+  return false;
+};
+
+// Identifica de forma rigorosa se um produto é uma pizza (doce ou salgada)
+const checkIfProductIsPizza = (
+  product: Product | null | undefined, 
+  categories: CategoryItem[] = []
+): boolean => {
   if (!product) return false;
   const name = (product.name || '').toLowerCase().trim();
   const cat = (product.category || '').toLowerCase().trim();
@@ -53,11 +98,14 @@ const checkIfProductIsPizza = (product: Product | null | undefined, categories: 
   );
   const categoryName = (catObj?.name || product.category || '').toLowerCase().trim();
 
-  // Lista abrangente de palavras-chave que indicam explicitamente que NÃO é pizza
+  // Se o próprio nome ou descrição contiver termo de pizza
+  const explicitPizzaTerms = ['pizza', 'calzone', 'brotinho', 'broto'];
+  const hasExplicitPizzaTerm = explicitPizzaTerms.some(term => name.includes(term) || desc.includes(term));
+
+  // Lista de itens estritamente NÃO-pizza (bebidas, porções, lanches convencionais)
   const nonPizzaKeywords = [
     'bebida', 'refrigerante', 'refri', 'suco', 'cerveja', 'água', 'agua', 
     'drink', 'drinks', 'chopp', 'chope', 'vinho', 'dose', 'energético', 'energetico', 
-    'sobremesa', 'sorvete', 'açai', 'acai', 'mousse', 'pudim', 'torta', 'brownie',
     'porção', 'porções', 'porcao', 'porcoes', 'batata', 'frita', 'fritas', 
     'entrada', 'entradas', 'acompanhamento', 'acompanhamentos', 'petisco', 'petiscos',
     'hamburguer', 'hambúrguer', 'burger', 'lanche', 'sanduiche', 'sanduíche', 
@@ -66,7 +114,8 @@ const checkIfProductIsPizza = (product: Product | null | undefined, categories: 
     'corona', 'amstel', 'eisenbahn', 'del valle', 'red bull', 'monster', 'lata', 'litro', 'long neck'
   ];
 
-  if (nonPizzaKeywords.some(term => 
+  // Se tem termo estrito de bebida/lanche/porção E NÃO tem pizza no nome
+  if (!hasExplicitPizzaTerm && nonPizzaKeywords.some(term => 
     categoryName.includes(term) || 
     cat.includes(term) || 
     sub.includes(term) || 
@@ -77,22 +126,26 @@ const checkIfProductIsPizza = (product: Product | null | undefined, categories: 
 
   // Se contiver a palavra "pizza" explicitamente no nome, categoria, subcategoria ou descrição
   if (
-    name.includes('pizza') || 
+    hasExplicitPizzaTerm || 
     categoryName.includes('pizza') || 
-    sub.includes('pizza') || 
-    desc.includes('pizza')
+    sub.includes('pizza')
   ) {
     return true;
   }
 
-  // Categorias ou subcategorias clássicas de pizzarias (mesmo quando o lojista não escreve a palavra 'pizza')
+  // Categorias clássicas de pizzarias (salgadas e doces)
   const pizzaCategoryKeywords = [
-    'salgada', 'doce', 'tradicionais', 'tradicional', 'especiais', 'especial', 
-    'premium', 'gourmet', 'calzone', 'calzones', 'brotinho', 'broto', 
-    'gigante', 'grande', 'média', 'media', 'pequena'
+    'salgada', 'salgadas', 'doce', 'doces', 'sweet', 'tradicionais', 'tradicional', 
+    'especiais', 'especial', 'premium', 'gourmet', 'calzone', 'calzones', 
+    'brotinho', 'broto', 'gigante', 'grande', 'média', 'media', 'pequena'
   ];
 
   if (pizzaCategoryKeywords.some(kw => categoryName.includes(kw) || sub.includes(kw))) {
+    return true;
+  }
+
+  // Se for pizza doce pelo perfil de recheio doce da pizzaria
+  if (checkIfProductIsSweetPizza(product, categories)) {
     return true;
   }
 
@@ -170,10 +223,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     }
   }, [product, onClose]);
 
-  // Identifica se o produto atual é uma pizza
+  // Identifica se o produto atual é uma pizza (doce ou salgada)
   const isPizza = useMemo(() => checkIfProductIsPizza(product, categories), [product, categories]);
 
-  // Separar Bordas e Adicionais aplicáveis (BORDAS APENAS PARA PIZZAS)
+  // Identifica se o produto atual é uma pizza doce
+  const isSweetPizza = useMemo(() => {
+    return Boolean(isPizza && checkIfProductIsSweetPizza(product, categories));
+  }, [isPizza, product, categories]);
+
+  // Separar Bordas e Adicionais aplicáveis (BORDAS PARA TODAS AS PIZZAS, INCLUINDO DOCES)
   const applicableComplements = useMemo(() => {
     if (!product || !complements) return [];
     return complements.filter(c => {
@@ -182,6 +240,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       // Bordas NUNCA são aplicáveis se o produto não for pizza!
       if (isBordaComp && !isPizza) return false;
 
+      // Se não houver restrição específica de categorias, aplica para todas as pizzas
       if (!c.applicable_categories || c.applicable_categories.length === 0) {
         return true;
       }
@@ -191,7 +250,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   }, [product, complements, isPizza]);
 
   const bordaItems = useMemo(() => {
-    // Bordas são estritamente exclusivas para pizzas
+    // Bordas são estritamente exclusivas para pizzas (salgadas e doces)
     if (!isPizza) return [];
     const list = applicableComplements.filter(c => 
       c.type === 'BORDA' || c.name.toLowerCase().includes('borda')
@@ -207,6 +266,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   }, [applicableComplements]);
 
   // Lista de outros sabores de pizza disponíveis para a segunda metade
+  // REGRA: Se for pizza doce, aceita apenas outras pizzas doces! Se for salgada, aceita apenas outras salgadas!
   const availableSecondFlavors = useMemo(() => {
     if (!isPizza || !product || !allProducts || allProducts.length === 0) return [];
     return allProducts.filter(p => {
@@ -223,6 +283,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       if (p.hidden || isOut) return false;
       if (!checkIfProductIsPizza(p, categories)) return false;
 
+      // REGRA SOLICITADA: Pizza doce apenas com doce; Pizza salgada apenas com salgada
+      const pIsSweet = checkIfProductIsSweetPizza(p, categories);
+      if (isSweetPizza) {
+        if (!pIsSweet) return false;
+      } else {
+        if (pIsSweet) return false;
+      }
+
       if (flavorSearch.trim()) {
         const query = flavorSearch.toLowerCase().trim();
         const matchesName = (p.name || '').toLowerCase().includes(query);
@@ -231,7 +299,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       }
       return true;
     });
-  }, [isPizza, product, allProducts, categories, flavorSearch]);
+  }, [isPizza, isSweetPizza, product, allProducts, categories, flavorSearch]);
 
   // Objeto de borda efetivo (se 'NONE', vira objeto sem_borda com price: 0)
   const effectiveBorda: Complement | null = useMemo(() => {
@@ -378,9 +446,22 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           {/* Header & Description */}
           <div>
             <div className="flex justify-between items-start gap-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-red-600 uppercase tracking-tighter leading-tight">
-                {product.name}
-              </h2>
+              <div>
+                {isPizza && (
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                      isSweetPizza 
+                        ? 'bg-pink-100 text-pink-700 border border-pink-200' 
+                        : 'bg-amber-100 text-amber-800 border border-amber-200'
+                    }`}>
+                      {isSweetPizza ? '🍫 Pizza Doce' : '🍕 Pizza Salgada'}
+                    </span>
+                  </div>
+                )}
+                <h2 className="text-2xl sm:text-3xl font-black text-red-600 uppercase tracking-tighter leading-tight">
+                  {product.name}
+                </h2>
+              </div>
               <span className="text-xl sm:text-2xl font-black text-red-600 bg-red-50 px-3.5 py-1.5 rounded-xl shrink-0">
                 R$ {product.price.toFixed(2)}
               </span>
@@ -444,22 +525,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   }}
                   className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer ${
                     pizzaMode === 'MEIO_A_MEIO'
-                      ? 'border-amber-500 bg-amber-50/80 text-amber-950 shadow-sm ring-2 ring-amber-500/20'
+                      ? (isSweetPizza 
+                          ? 'border-pink-500 bg-pink-50/80 text-pink-950 shadow-sm ring-2 ring-pink-500/20' 
+                          : 'border-amber-500 bg-amber-50/80 text-amber-950 shadow-sm ring-2 ring-amber-500/20')
                       : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">🌓</span>
+                    <span className="text-2xl">{isSweetPizza ? '🍫' : '🌓'}</span>
                     <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                      pizzaMode === 'MEIO_A_MEIO' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'
+                      pizzaMode === 'MEIO_A_MEIO' 
+                        ? (isSweetPizza ? 'bg-pink-600 text-white' : 'bg-amber-600 text-white') 
+                        : 'bg-slate-100 text-slate-500'
                     }`}>
-                      2 Sabores
+                      {isSweetPizza ? '2 Sabores Doces' : '2 Sabores'}
                     </span>
                   </div>
                   <div>
                     <div className="font-black text-sm uppercase tracking-tight">Meio a Meio</div>
-                    <div className="text-xs text-slate-500 font-medium">Divida em 2 sabores</div>
-                    <div className="text-xs font-black text-amber-700 mt-1">
+                    <div className="text-xs text-slate-500 font-medium">
+                      {isSweetPizza ? 'Divida em 2 sabores doces' : 'Divida em 2 sabores'}
+                    </div>
+                    <div className={`text-xs font-black mt-1 ${isSweetPizza ? 'text-pink-700' : 'text-amber-700'}`}>
                       Soma das metades
                     </div>
                   </div>
@@ -472,10 +559,33 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           {isPizza && pizzaMode === 'MEIO_A_MEIO' && (
             <div ref={secondFlavorSectionRef} className="space-y-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
               
+              {/* Informativo da regra de combinação meio a meio */}
+              <div className={`p-3 rounded-2xl border flex items-start gap-2.5 text-xs font-bold ${
+                isSweetPizza 
+                  ? 'bg-pink-50 border-pink-200 text-pink-950' 
+                  : 'bg-amber-50 border-amber-200 text-amber-950'
+              }`}>
+                <span className="text-lg shrink-0">{isSweetPizza ? '🍫' : '🍕'}</span>
+                <div>
+                  <div className="font-black uppercase text-[11px] tracking-wide">
+                    {isSweetPizza 
+                      ? 'Combinação Meio a Meio: Apenas Pizzas Doces' 
+                      : 'Combinação Meio a Meio: Apenas Pizzas Salgadas'}
+                  </div>
+                  <p className="text-[11px] font-medium mt-0.5 opacity-90">
+                    {isSweetPizza
+                      ? 'Para garantir a melhor combinação e preparo, pizzas doces podem ser montadas apenas com outros sabores de pizza doce.'
+                      : 'A segunda metade deve ser combinada com outro sabor de pizza salgada do nosso cardápio.'}
+                  </p>
+                </div>
+              </div>
+
               {/* 1º Sabor (Fixo da pizza aberta) */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-8 h-8 rounded-xl bg-red-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm">
+                  <span className={`w-8 h-8 rounded-xl text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm ${
+                    isSweetPizza ? 'bg-pink-600' : 'bg-red-600'
+                  }`}>
                     1/2
                   </span>
                   <div className="min-w-0">
@@ -485,7 +595,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-[10px] text-slate-400 font-bold uppercase">Metade</div>
-                  <div className="text-sm font-black text-red-600">R$ {firstHalfPrice.toFixed(2)}</div>
+                  <div className={`text-sm font-black ${isSweetPizza ? 'text-pink-600' : 'text-red-600'}`}>
+                    R$ {firstHalfPrice.toFixed(2)}
+                  </div>
                 </div>
               </div>
 
@@ -493,10 +605,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-amber-500 text-white text-[11px] font-black flex items-center justify-center shadow-sm">
+                    <span className={`w-6 h-6 rounded-lg text-white text-[11px] font-black flex items-center justify-center shadow-sm ${
+                      isSweetPizza ? 'bg-pink-500' : 'bg-amber-500'
+                    }`}>
                       2/2
                     </span>
-                    Escolha o 2º Sabor da Pizza:
+                    {isSweetPizza ? 'Escolha o 2º Sabor Doce da Pizza:' : 'Escolha o 2º Sabor da Pizza:'}
                   </label>
                   {selectedSecondFlavor && (
                     <button
@@ -517,7 +631,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                         {selectedSecondFlavor.image ? (
                           <img src={selectedSecondFlavor.image} alt={selectedSecondFlavor.name} className="w-full h-full object-contain" />
                         ) : (
-                          <span className="text-2xl">🍕</span>
+                          <span className="text-2xl">{isSweetPizza ? '🍫' : '🍕'}</span>
                         )}
                       </div>
                       <div className="min-w-0">
@@ -549,7 +663,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                           type="text"
                           value={flavorSearch}
                           onChange={e => setFlavorSearch(e.target.value)}
-                          placeholder="Buscar sabor por nome..."
+                          placeholder={isSweetPizza ? "Buscar sabor de pizza doce..." : "Buscar sabor por nome..."}
                           className="w-full px-4 py-2.5 pl-9 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-500 focus:bg-white transition-all"
                         />
                         <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
@@ -568,7 +682,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-2xl p-2 bg-slate-50/50">
                       {availableSecondFlavors.length === 0 ? (
                         <div className="p-4 text-center text-xs text-slate-400 font-medium">
-                          Nenhum outro sabor encontrado {flavorSearch ? `para "${flavorSearch}"` : ''}.
+                          {isSweetPizza 
+                            ? `Nenhum outro sabor de pizza doce disponível${flavorSearch ? ` para "${flavorSearch}"` : ''}.`
+                            : `Nenhum outro sabor encontrado${flavorSearch ? ` para "${flavorSearch}"` : ''}.`}
                         </div>
                       ) : (
                         availableSecondFlavors.map(flavor => {
@@ -595,7 +711,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                                   {flavor.image ? (
                                     <img src={flavor.image} alt={flavor.name} className="w-full h-full object-contain" />
                                   ) : (
-                                    <span className="text-lg">🍕</span>
+                                    <span className="text-lg">{isSweetPizza ? '🍫' : '🍕'}</span>
                                   )}
                                 </div>
                                 <div className="min-w-0">
@@ -653,8 +769,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                    <span className="text-base">🥖</span>
-                    <span>Borda da Pizza</span>
+                    <span className="text-base">{isSweetPizza ? '🍫' : '🥖'}</span>
+                    <span>Recheio na Borda da Pizza</span>
                     {isBordaMandatory && (
                       <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase transition-all ${
                         bordaSelection === null
@@ -670,6 +786,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                       ? '✓ Opção escolhida: Massa tradicional sem recheio na borda.'
                       : (bordaSelection && typeof bordaSelection === 'object')
                       ? `✓ Borda "${bordaSelection.name}" selecionada. As demais foram desabilitadas.`
+                      : isSweetPizza
+                      ? 'Escolha o recheio na borda para a sua pizza doce (ou selecione "SEM BORDA" para a massa tradicional).'
                       : 'Escolha obrigatória: selecione 1 borda recheada ou marque "SEM BORDA" logo abaixo.'}
                   </p>
                 </div>

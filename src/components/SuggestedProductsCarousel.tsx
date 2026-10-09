@@ -119,32 +119,31 @@ export const SuggestedProductsCarousel: React.FC<SuggestedProductsCarouselProps>
           )}
         </div>
 
-        {/* Setas de rolagem para desktop */}
-        <div className="hidden sm:flex items-center gap-1 shrink-0">
+        {/* Setas de rolagem sempre visíveis */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => handleScroll('left')}
-            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-black text-xs transition-colors cursor-pointer"
-            title="Anterior"
+            className="w-7 h-7 rounded-lg bg-white hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 flex items-center justify-center font-black text-sm shadow-2xs transition-all cursor-pointer active:scale-95"
+            title="Ver sugestões anteriores"
           >
             ‹
           </button>
           <button
             type="button"
             onClick={() => handleScroll('right')}
-            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-black text-xs transition-colors cursor-pointer"
-            title="Próximo"
+            className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center font-black text-sm shadow-xs transition-all cursor-pointer active:scale-95"
+            title="Ver mais sugestões"
           >
             ›
           </button>
         </div>
       </div>
 
-      {/* Container Rolável de Produtos (Carrossel Horizontal) */}
+      {/* Container Rolável de Produtos (Carrossel Horizontal com Barra de Rolagem Visível) */}
       <div 
         ref={scrollContainerRef}
-        className="flex gap-3 overflow-x-auto pb-3 pt-1 px-0.5 no-scrollbar scroll-smooth snap-x touch-pan-x"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        className="flex gap-3 overflow-x-auto pb-3.5 pt-1 px-1 custom-scrollbar-x scroll-smooth snap-x touch-pan-x"
       >
         {suggestedProducts.map(item => {
           const cartCount = getProductCartCount(item.id);
@@ -248,6 +247,32 @@ export const SuggestedProductsCarousel: React.FC<SuggestedProductsCarouselProps>
           );
         })}
       </div>
+
+      {/* Indicador e Atalhos da Barra de Rolagem */}
+      {suggestedProducts.length > 2 && (
+        <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 px-0.5 pt-0.5">
+          <div className="flex items-center gap-1.5 text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded-full text-[10px] font-black border border-amber-200 shadow-2xs">
+            <span className="text-xs">👉</span>
+            <span>Use a barra de rolagem ou arraste para ver mais ({suggestedProducts.length} itens)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handleScroll('left')}
+              className="text-[10px] font-black uppercase text-slate-500 hover:text-slate-800 px-1.5 py-0.5 rounded hover:bg-slate-200/60 transition-colors cursor-pointer"
+            >
+              ‹ Voltar
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScroll('right')}
+              className="text-[10px] font-black uppercase text-amber-800 hover:text-amber-950 px-1.5 py-0.5 rounded hover:bg-amber-100 transition-colors cursor-pointer"
+            >
+              Mais ›
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

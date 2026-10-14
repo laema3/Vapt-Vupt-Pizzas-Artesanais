@@ -11,6 +11,7 @@ import { Eye, EyeOff, Bot, Sparkles, Send, CheckCircle2, AlertCircle, RefreshCw,
 import { printOrderReceipt } from '../utils/printReceipt.ts';
 import { formatOrderNumber } from '../utils/format.ts';
 import { sendTestNtfyNotification } from '../services/ntfyService.ts';
+import { ALL_SCHEDULE_HOURS } from '../constants.tsx';
 
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 const APP_VERSION = "v6.0 (Subcategorias & Import SQL)";
@@ -126,6 +127,8 @@ interface AdminPanelProps {
   onDeleteUncoveredCep?: (id: string) => Promise<void>;
   scheduleAllowed?: boolean;
   onUpdateScheduleAllowed?: (allowed: boolean) => void;
+  disabledScheduleSlots?: string[];
+  onUpdateDisabledScheduleSlots?: (slots: string[]) => void;
 }
 
 type AdminView = 'dashboard' | 'pedidos' | 'produtos' | 'categorias' | 'subcategorias' | 'bordas' | 'adicionais' | 'cupons' | 'precificacao' | 'sugestoes' | 'entregas' | 'clientes' | 'pagamentos' | 'mesas' | 'horarios' | 'horarios-agendamento' | 'motoboys' | 'bellabot' | 'ajustes';
@@ -150,7 +153,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     botSettings, onUpdateBotSettings,
     ntfyTopic, onUpdateNtfyTopic,
     uncoveredCeps, onDeleteUncoveredCep,
-    scheduleAllowed = true, onUpdateScheduleAllowed
+    scheduleAllowed = true, onUpdateScheduleAllowed,
+    disabledScheduleSlots = [], onUpdateDisabledScheduleSlots
   } = props;
 
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
@@ -971,7 +975,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
             )}
 
             {activeView === 'horarios-agendamento' && (
-               <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in">
+               <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
                   <div className="bg-white p-8 sm:p-12 rounded-[40px] border border-slate-200 shadow-sm space-y-6 text-center">
                     <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto text-4xl font-black shadow-inner">📅</div>
                     <div>
@@ -982,7 +986,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                     <div className="p-8 bg-slate-50 border-2 border-slate-200 rounded-3xl flex flex-col items-center gap-6">
                       <div className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-full border border-slate-200 shadow-sm">
                         <span className={`w-3.5 h-3.5 rounded-full ${scheduleAllowed ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
-                        <span className="font-black text-xs uppercase tracking-widest text-slate-700">Status: {scheduleAllowed ? 'Habilitado' : 'Desabilitado'}</span>
+                        <span className="font-black text-xs uppercase tracking-widest text-slate-700">Status Geral: {scheduleAllowed ? 'Habilitado' : 'Desabilitado'}</span>
                       </div>
 
                       <button
@@ -990,19 +994,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                           const next = !scheduleAllowed;
                           if (onUpdateScheduleAllowed) onUpdateScheduleAllowed(next);
                         }}
-                        className={`w-full py-6 rounded-2xl font-black uppercase text-base tracking-widest shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-3 ${
+                        className={`w-full max-w-md py-6 rounded-2xl font-black uppercase text-base tracking-widest shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-3 ${
                           scheduleAllowed 
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30' 
                             : 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/30'
                         }`}
                       >
                         <span className="text-xl">{scheduleAllowed ? '🟢' : '🔴'}</span>
-                        <span>LIBERADO PARA PEDIDOS</span>
+                        <span>{scheduleAllowed ? 'DESABILITAR AGENDAMENTO' : 'HABILITAR AGENDAMENTO'}</span>
                       </button>
 
-                      <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-                        Quando habilitado (<strong>LIBERADO PARA PEDIDOS</strong>), os clientes poderão fazer agendamentos e concluir pedidos mesmo fora do expediente (com a loja fechada). Ao desabilitar, o agendamento só é permitido com a loja aberta.
+                      <p className="text-xs text-slate-600 font-semibold leading-relaxed max-w-md">
+                        Quando habilitado, os clientes poderão fazer agendamentos mesmo fora do expediente. Desative para permitir agendamento apenas com a loja aberta.
                       </p>
+
+                      <div className="mt-8 pt-8 border-t border-slate-200 w-full text-left">
+                        <h3 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-2 flex items-center gap-2">
+                          <span>⏰</span> Horários Disponíveis
+                        </h3>
+                        <p className="text-slate-500 text-xs mb-6 font-medium">
+                          Clique para desmarcar os horários que você <strong>não deseja</strong> que apareçam para os clientes no agendamento.
+                        </p>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                          {ALL_SCHEDULE_HOURS.map(slot => {
+                            const isDisabled = disabledScheduleSlots.includes(slot);
+                            return (
+                              <button
+                                key={slot}
+                                onClick={() => {
+                                  if (!onUpdateDisabledScheduleSlots) return;
+                                  const newDisabled = isDisabled
+                                    ? disabledScheduleSlots.filter(s => s !== slot)
+                                    : [...disabledScheduleSlots, slot];
+                                  onUpdateDisabledScheduleSlots(newDisabled);
+                                }}
+                                className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                                  !isDisabled
+                                    ? 'bg-white border-emerald-100 text-slate-700 hover:border-emerald-500'
+                                    : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{slot}</span>
+                                <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                                  !isDisabled ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-200 text-slate-400'
+                                }`}>
+                                  {!isDisabled ? '✓' : ''}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                </div>

@@ -251,6 +251,7 @@ const App: React.FC = () => {
   const [cepModalInitialStep, setCepModalInitialStep] = useState<'INPUT' | 'CHOICE' | 'SCHEDULE'>('INPUT');
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
   const [scheduleAllowed, setScheduleAllowed] = useState(true);
+  const [disabledScheduleSlots, setDisabledScheduleSlots] = useState<string[]>([]);
 
   // Fecha o modal de CEP e marca como verificado automaticamente para usuários logados
   useEffect(() => {
@@ -493,6 +494,7 @@ const App: React.FC = () => {
             }
             if (settings.ntfyTopic) setNtfyTopic(settings.ntfyTopic);
             if (settings.scheduleAllowed !== undefined) setScheduleAllowed(settings.scheduleAllowed);
+            if (settings.disabledScheduleSlots) setDisabledScheduleSlots(settings.disabledScheduleSlots);
             if (settings.storeHours) {
               setStoreHours(settings.storeHours);
               const openNow = isStoreCurrentlyOpen(settings.storeHours);
@@ -1519,6 +1521,11 @@ const App: React.FC = () => {
             onUpdateScheduleAllowed={(allowed) => {
               setScheduleAllowed(allowed);
               dbService.save('settings', 'general', { scheduleAllowed: allowed });
+            }}
+            disabledScheduleSlots={disabledScheduleSlots}
+            onUpdateDisabledScheduleSlots={(slots) => {
+              setDisabledScheduleSlots(slots);
+              dbService.save('settings', 'general', { disabledScheduleSlots: slots });
             }}
             onLogout={() => { 
               setShowAdminPanel(false); 

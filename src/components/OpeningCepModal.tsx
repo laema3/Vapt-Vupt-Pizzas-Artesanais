@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ZipRange, Order, Customer } from '../types';
+import { ALL_SCHEDULE_HOURS } from '../constants';
 import { checkZipCoverage, fetchAddressByCep } from '../utils/zipUtils';
 import { safeStorage } from '../utils/safeStorage';
 
@@ -15,14 +16,8 @@ interface OpeningCepModalProps {
   onVerifySuccess: (cep: string, addressInfo: { address?: string; neighborhood?: string; city?: string }, fee: number, scheduledTime?: string | null) => void;
   onChoosePickup: (scheduledTime?: string | null) => void;
   onLogUncoveredCep?: (cep: string) => void;
+  disabledScheduleSlots?: string[];
 }
-
-const ALL_SCHEDULE_HOURS = [
-  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
-  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', 
-  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', 
-  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'
-];
 
 export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   isOpen,
@@ -35,7 +30,8 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   initialStep = 'INPUT',
   onVerifySuccess,
   onChoosePickup,
-  onLogUncoveredCep
+  onLogUncoveredCep,
+  disabledScheduleSlots = []
 }) => {
   const [cepInput, setCepInput] = useState('');
   const [customTimeInput, setCustomTimeInput] = useState('');
@@ -552,7 +548,7 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1">
-                {ALL_SCHEDULE_HOURS.map((slot) => {
+                {ALL_SCHEDULE_HOURS.filter(s => !disabledScheduleSlots.includes(s)).map((slot) => {
                   const count = getSlotReservedCount(slot);
                   const remaining = 4 - count;
                   const isFull = remaining <= 0;

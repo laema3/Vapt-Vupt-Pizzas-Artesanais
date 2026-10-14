@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CartItem, Coupon, PaymentSettings, Customer, DeliveryType, ZipRange, Product, CategoryItem, Order } from '../types';
+import { ALL_SCHEDULE_HOURS } from '../constants';
 import { checkZipCoverage, fetchAddressByCep, parseAddressParts, buildFullAddress } from '../utils/zipUtils';
 import { sendOutOfAreaNotification } from '../services/ntfyService';
 import { SuggestedProductsCarousel } from './SuggestedProductsCarousel';
@@ -47,14 +48,10 @@ interface CartSidebarProps {
   logoUrl?: string;
   orders?: Order[];
   onSelectScheduledTime?: (time: string | null) => void;
+  disabledScheduleSlots?: string[];
 }
 
-const ALL_SCHEDULE_HOURS = [
-  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
-  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', 
-  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', 
-  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'
-];
+
 
 const getSlotReservedCount = (slot: string, ordersList: Order[] = []) => {
   return ordersList.filter(o => o.scheduledTime === slot && o.status !== 'CANCELADO' && o.status !== 'FINALIZADO').length;
@@ -886,7 +883,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       </div>
 
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-48 overflow-y-auto p-1 bg-white/80 rounded-xl border border-amber-200/50">
-                        {ALL_SCHEDULE_HOURS.map(slot => {
+                        {ALL_SCHEDULE_HOURS.filter(slot => !disabledScheduleSlots.includes(slot)).map(slot => {
                           const count = getSlotReservedCount(slot, orders);
                           const remaining = 4 - count;
                           const isFull = remaining <= 0;

@@ -77,7 +77,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   isOpen, onClose, items, coupons, onUpdateQuantity, onRemove, onCheckout, onAuthClick, 
   paymentSettings, tables, currentUser, isKioskMode, deliveryFee, availableCoupons, isStoreOpen, isProcessing,
   onShowToast, defaultTableId, isAdmin, forcedDeliveryType, zipRanges = [], ntfyTopic, scheduledTime, onOpenScheduleModal, scheduleAllowed = true,
-  allProducts = [], categories = [], onAddSuggestedProduct, logoUrl, orders = [], onSelectScheduledTime
+  allProducts = [], categories = [], onAddSuggestedProduct, logoUrl, orders = [], onSelectScheduledTime,
+  disabledScheduleSlots = []
 }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -101,6 +102,16 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const [isSchedulingOpen, setIsSchedulingOpen] = useState(false);
   const [customTimeInput, setCustomTimeInput] = useState('');
   const [customTimeError, setCustomTimeError] = useState('');
+
+  const isAnySlotAvailable = useMemo(() => {
+    return ALL_SCHEDULE_HOURS.some(slot => {
+      const isBlocked = disabledScheduleSlots?.includes(slot);
+      const count = getSlotReservedCount(slot, orders);
+      const isFull = count >= 4;
+      const passed = isSlotPassed(slot);
+      return !isBlocked && !isFull && !passed;
+    });
+  }, [disabledScheduleSlots, orders]);
 
   const scheduleRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
@@ -360,6 +371,12 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       if (onShowToast) onShowToast(msg, 'error');
       return;
     }
+    if (disabledScheduleSlots?.includes(slot)) {
+      const msg = `⚠️ Este horário (${slot}) não está disponível para agendamento hoje.`;
+      alert(msg);
+      if (onShowToast) onShowToast(msg, 'error');
+      return;
+    }
     if (onSelectScheduledTime) {
       onSelectScheduledTime(slot);
     }
@@ -391,9 +408,16 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
     setCustomTimeError('');
 
     const targetMinutes = h * 60 + m;
-    let closestSlot = ALL_SCHEDULE_HOURS[0];
+    let closestSlot: string | null = null;
     let minDiff = Infinity;
     for (const slot of ALL_SCHEDULE_HOURS) {
+      const isBlocked = disabledScheduleSlots?.includes(slot);
+      const count = getSlotReservedCount(slot, orders);
+      const isFull = count >= 4;
+      const passed = isSlotPassed(slot);
+      
+      if (isBlocked || isFull || passed) continue;
+
       const [sh, sm] = slot.split(':').map(Number);
       const slotMinutes = sh * 60 + sm;
       const diff = Math.abs(slotMinutes - targetMinutes);
@@ -401,6 +425,11 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         minDiff = diff;
         closestSlot = slot;
       }
+    }
+
+    if (!closestSlot) {
+      setCustomTimeError('Não há horários disponíveis para agendamento hoje.');
+      return;
     }
 
     handleSelectSlot(closestSlot);
@@ -864,16 +893,18 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            placeholder="HH:MM"
+                            placeholder={isAnySlotAvailable ? "HH:MM" : "Indisponível"}
                             maxLength={5}
                             value={customTimeInput}
                             onChange={(e) => setCustomTimeInput(e.target.value)}
-                            className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 w-24 text-center focus:ring-1 focus:ring-red-500"
+                            disabled={!isAnySlotAvailable}
+                            className={`bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 w-24 text-center focus:ring-1 focus:ring-red-500 ${!isAnySlotAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
                           />
                           <button
                             type="button"
                             onClick={handleCustomTimeSubmit}
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-colors"
+                            disabled={!isAnySlotAvailable}
+                            className={`flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ${!isAnySlotAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             Confirmar Horário
                           </button>
@@ -884,7 +915,18 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       </div>
 
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-48 overflow-y-auto p-1 bg-white/80 rounded-xl border border-amber-200/50">
-                        {ALL_SCHEDULE_HOURS.filter(slot => !disabledScheduleSlots.includes(slot)).map(slot => {
+                        {ALL_SCHEDULE_HOURS.filter(slot => {
+                          const isBlocked = disabledScheduleSlots?.includes(slot);
+                          const count = getSlotReservedCount(slot, orders);
+                          const isFull = count >= 4;
+                          const passed = isSlotPassed(slot);
+                          const isDisabled = isBlocked || isFull || passed;
+
+                          if (customTimeInput && customTimeInput.length > 0) {
+                            return !isDisabled && slot.includes(customTimeInput);
+                          }
+                          return !isBlocked;
+                        }).map(slot => {
                           const count = getSlotReservedCount(slot, orders);
                           const remaining = 4 - count;
                           const isFull = remaining <= 0;

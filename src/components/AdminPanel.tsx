@@ -1065,6 +1065,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                               try {
                                 await onUpdateDisabledScheduleSlots(tempDisabledSlots);
                                 setScheduleSlotsSaveSuccess(true);
+                                alert("✓ Horários de agendamento atualizados com sucesso!");
                                 setTimeout(() => setScheduleSlotsSaveSuccess(false), 5000);
                               } finally {
                                 setIsScheduleSlotsSaving(false);

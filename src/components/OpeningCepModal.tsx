@@ -20,6 +20,26 @@ interface OpeningCepModalProps {
   scheduleAllowed?: boolean;
 }
 
+const getSlotReservedCount = (slot: string, ordersList: Order[] = []) => {
+  return ordersList.filter(o => o.scheduledTime === slot && o.status !== 'CANCELADO' && o.status !== 'FINALIZADO').length;
+};
+
+const getDeliveryTime = (slot: string) => {
+  const [h, m] = slot.split(':').map(Number);
+  const totalMinutes = h * 60 + m + 120; // 2 hours later
+  const delH = Math.floor(totalMinutes / 60) % 24;
+  const delM = totalMinutes % 60;
+  return `${String(delH).padStart(2, '0')}:${String(delM).padStart(2, '0')}`;
+};
+
+const isSlotPassed = (slot: string) => {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const [slotHour, slotMinute] = slot.split(':').map(Number);
+  return currentHour > slotHour || (currentHour === slotHour && currentMinute > slotMinute);
+};
+
 export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   isOpen,
   onClose,
@@ -79,6 +99,16 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
       }
     }
   }, [isOpen, initialStep, zipRanges, currentUser]);
+
+  const isAnySlotAvailable = React.useMemo(() => {
+    return ALL_SCHEDULE_HOURS.some(slot => {
+      const isBlocked = disabledScheduleSlots?.includes(slot);
+      const count = getSlotReservedCount(slot, orders);
+      const isFull = count >= 4;
+      const passed = isSlotPassed(slot);
+      return !isBlocked && !isFull && !passed;
+    });
+  }, [disabledScheduleSlots, orders]);
 
   if (!isOpen) return null;
 
@@ -156,34 +186,18 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
     }
   };
 
-  const getSlotReservedCount = (slot: string) => {
-    return orders.filter(o => o.scheduledTime === slot && o.status !== 'CANCELADO' && o.status !== 'FINALIZADO').length;
-  };
-
-  const getDeliveryTime = (slot: string) => {
-    const [h, m] = slot.split(':').map(Number);
-    const totalMinutes = h * 60 + m + 120; // 2 hours later
-    const delH = Math.floor(totalMinutes / 60) % 24;
-    const delM = totalMinutes % 60;
-    return `${String(delH).padStart(2, '0')}:${String(delM).padStart(2, '0')}`;
-  };
-
-  const isSlotPassed = (slot: string) => {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const [slotHour, slotMinute] = slot.split(':').map(Number);
-    return currentHour > slotHour || (currentHour === slotHour && currentMinute > slotMinute);
-  };
-
   const handleFinalizeScheduled = (slot: string) => {
-    const count = getSlotReservedCount(slot);
+    const count = getSlotReservedCount(slot, orders);
     if (count >= 4) {
       alert(`⚠️ Este horário (${slot}) já atingiu a capacidade máxima de 4 pedidos. Por favor, escolha outro horário disponível.`);
       return;
     }
     if (isSlotPassed(slot)) {
       alert(`⚠️ Este horário (${slot}) já passou. Por favor, escolha um horário disponível.`);
+      return;
+    }
+    if (disabledScheduleSlots?.includes(slot)) {
+      alert(`⚠️ Este horário (${slot}) não está disponível para agendamento hoje.`);
       return;
     }
     setConfirmingSlot(slot);
@@ -209,9 +223,16 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
     setCustomTimeError('');
 
     const targetMinutes = h * 60 + m;
-    let closestSlot = ALL_SCHEDULE_HOURS[0];
+    let closestSlot: string | null = null;
     let minDiff = Infinity;
     for (const slot of ALL_SCHEDULE_HOURS) {
+      const isBlocked = disabledScheduleSlots?.includes(slot);
+      const count = getSlotReservedCount(slot, orders);
+      const isFull = count >= 4;
+      const passed = isSlotPassed(slot);
+
+      if (isBlocked || isFull || passed) continue;
+
       const [sh, sm] = slot.split(':').map(Number);
       const slotMinutes = sh * 60 + sm;
       const diff = Math.abs(slotMinutes - targetMinutes);
@@ -219,6 +240,11 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
         minDiff = diff;
         closestSlot = slot;
       }
+    }
+
+    if (!closestSlot) {
+      setCustomTimeError('Não há horários disponíveis para agendamento hoje.');
+      return;
     }
 
     handleFinalizeScheduled(closestSlot);
@@ -532,16 +558,18 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="HH:MM"
+                    placeholder={isAnySlotAvailable ? "HH:MM" : "Indisponível"}
                     maxLength={5}
                     value={customTimeInput}
                     onChange={(e) => setCustomTimeInput(e.target.value)}
-                    className="bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 w-32 text-center"
+                    disabled={!isAnySlotAvailable}
+                    className={`bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 w-32 text-center ${!isAnySlotAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                   <button
                     type="button"
                     onClick={handleCustomTimeSubmit}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                    disabled={!isAnySlotAvailable}
+                    className={`flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${!isAnySlotAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     Agendar Horário Digitado
                   </button>
@@ -552,8 +580,19 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1">
-                {ALL_SCHEDULE_HOURS.filter(s => !disabledScheduleSlots.includes(s)).map((slot) => {
-                  const count = getSlotReservedCount(slot);
+                {ALL_SCHEDULE_HOURS.filter(slot => {
+                  const isBlocked = disabledScheduleSlots.includes(slot);
+                  const count = getSlotReservedCount(slot, orders);
+                  const isFull = count >= 4;
+                  const passed = isSlotPassed(slot);
+                  const isDisabled = isBlocked || isFull || passed;
+
+                  if (customTimeInput && customTimeInput.length > 0) {
+                    return !isDisabled && slot.includes(customTimeInput);
+                  }
+                  return !isBlocked;
+                }).map((slot) => {
+                  const count = getSlotReservedCount(slot, orders);
                   const remaining = 4 - count;
                   const isFull = remaining <= 0;
                   const passed = isSlotPassed(slot);

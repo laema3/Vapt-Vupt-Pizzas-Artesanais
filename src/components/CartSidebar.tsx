@@ -778,7 +778,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                 <span>←</span> Continuar Comprando
               </button>
 
-              <div ref={scheduleRef} className="space-y-3">
+              {scheduleAllowed && (
+                <div ref={scheduleRef} className="space-y-3">
                 <div className="bg-amber-50/80 p-4 rounded-2xl border-2 border-amber-200/90 shadow-xs space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-black text-amber-950 uppercase tracking-widest flex items-center gap-1.5">
@@ -917,8 +918,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   )}
                 </div>
               </div>
+            )}
 
-              <div ref={deliveryRef} className="space-y-3">
+            <div ref={deliveryRef} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Entrega</h3>
                   {deliveryType && (

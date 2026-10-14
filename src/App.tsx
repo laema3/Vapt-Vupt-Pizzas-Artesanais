@@ -1841,6 +1841,7 @@ const App: React.FC = () => {
           sendOutOfAreaNotification(ntfyTopic, cep).catch(() => {});
         }}
         disabledScheduleSlots={disabledScheduleSlots}
+        scheduleAllowed={scheduleAllowed}
       />
       <AuthModal 
         isOpen={isAuthModalOpen} 

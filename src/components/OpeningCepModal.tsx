@@ -17,6 +17,7 @@ interface OpeningCepModalProps {
   onChoosePickup: (scheduledTime?: string | null) => void;
   onLogUncoveredCep?: (cep: string) => void;
   disabledScheduleSlots?: string[];
+  scheduleAllowed?: boolean;
 }
 
 export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
@@ -31,7 +32,8 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
   onVerifySuccess,
   onChoosePickup,
   onLogUncoveredCep,
-  disabledScheduleSlots = []
+  disabledScheduleSlots = [],
+  scheduleAllowed = true
 }) => {
   const [cepInput, setCepInput] = useState('');
   const [customTimeInput, setCustomTimeInput] = useState('');
@@ -447,19 +449,21 @@ export const OpeningCepModal: React.FC<OpeningCepModalProps> = ({
                 <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
               </button>
 
-              <button
-                onClick={() => setModalStep('SCHEDULE')}
-                className="w-full bg-red-600 hover:bg-red-700 text-white p-5 rounded-2xl font-black uppercase text-sm tracking-wider shadow-xl shadow-red-600/25 transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl p-2 bg-white/15 rounded-xl">📅</span>
-                  <div className="text-left">
-                    <div className="text-base font-black">AGENDAR PEDIDO</div>
-                    <div className="text-[10px] text-red-200 font-semibold">Escolha um horário (entrega 2h após)</div>
+              {scheduleAllowed && (
+                <button
+                  onClick={() => setModalStep('SCHEDULE')}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white p-5 rounded-2xl font-black uppercase text-sm tracking-wider shadow-xl shadow-red-600/25 transition-all flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl p-2 bg-white/15 rounded-xl">📅</span>
+                    <div className="text-left">
+                      <div className="text-base font-black">AGENDAR PEDIDO</div>
+                      <div className="text-[10px] text-red-200 font-semibold">Escolha um horário (entrega 2h após)</div>
+                    </div>
                   </div>
-                </div>
-                <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
-              </button>
+                  <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setModalStep('INPUT')}

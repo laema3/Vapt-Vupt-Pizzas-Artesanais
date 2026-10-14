@@ -166,12 +166,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [ntfyTopicInput, setNtfyTopicInput] = useState(ntfyTopic || 'bellaborda-ceps');
   const [isTestingNtfy, setIsTestingNtfy] = useState(false);
   const [ntfyTestStatus, setNtfyTestStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  
+  const [tempDisabledSlots, setTempDisabledSlots] = useState<string[]>(disabledScheduleSlots);
+  const [isScheduleSlotsSaving, setIsScheduleSlotsSaving] = useState(false);
+  const [scheduleSlotsSaveSuccess, setScheduleSlotsSaveSuccess] = useState(false);
 
   useEffect(() => {
     if (ntfyTopic) {
       setNtfyTopicInput(ntfyTopic);
     }
   }, [ntfyTopic]);
+
+  useEffect(() => {
+    if (activeView === 'horarios-agendamento') {
+      setTempDisabledSlots(disabledScheduleSlots);
+      setScheduleSlotsSaveSuccess(false);
+    }
+  }, [activeView, disabledScheduleSlots]);
 
   const handleTestNtfy = async () => {
     setIsTestingNtfy(true);
@@ -1018,16 +1029,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                           {ALL_SCHEDULE_HOURS.map(slot => {
-                            const isDisabled = disabledScheduleSlots.includes(slot);
+                            const isDisabled = tempDisabledSlots.includes(slot);
                             return (
                               <button
                                 key={slot}
                                 onClick={() => {
-                                  if (!onUpdateDisabledScheduleSlots) return;
                                   const newDisabled = isDisabled
-                                    ? disabledScheduleSlots.filter(s => s !== slot)
-                                    : [...disabledScheduleSlots, slot];
-                                  onUpdateDisabledScheduleSlots(newDisabled);
+                                    ? tempDisabledSlots.filter(s => s !== slot)
+                                    : [...tempDisabledSlots, slot];
+                                  setTempDisabledSlots(newDisabled);
+                                  setScheduleSlotsSaveSuccess(false);
                                 }}
                                 className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${
                                   !isDisabled
@@ -1044,6 +1055,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                               </button>
                             );
                           })}
+                        </div>
+
+                        <div className="mt-10 flex flex-col items-center gap-4">
+                          <button
+                            onClick={async () => {
+                              if (!onUpdateDisabledScheduleSlots) return;
+                              setIsScheduleSlotsSaving(true);
+                              try {
+                                await onUpdateDisabledScheduleSlots(tempDisabledSlots);
+                                setScheduleSlotsSaveSuccess(true);
+                                setTimeout(() => setScheduleSlotsSaveSuccess(false), 5000);
+                              } finally {
+                                setIsScheduleSlotsSaving(false);
+                              }
+                            }}
+                            disabled={isScheduleSlotsSaving}
+                            className={`w-full max-w-md py-5 rounded-2xl font-black uppercase text-base tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer ${
+                              isScheduleSlotsSaving 
+                                ? 'bg-slate-400 cursor-not-allowed text-white' 
+                                : 'bg-slate-900 hover:bg-black text-white shadow-slate-900/20'
+                            }`}
+                          >
+                            {isScheduleSlotsSaving ? (
+                              <>
+                                <span className="animate-spin text-xl">⏳</span>
+                                <span>SALVANDO...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xl">💾</span>
+                                <span>SALVAR ALTERAÇÕES</span>
+                              </>
+                            )}
+                          </button>
+
+                          {scheduleSlotsSaveSuccess && (
+                            <div className="bg-emerald-100 text-emerald-800 px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wide animate-in zoom-in slide-in-from-top-4">
+                              ✓ Horários atualizados com sucesso!
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

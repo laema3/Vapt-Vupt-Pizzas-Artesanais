@@ -1807,6 +1807,7 @@ const App: React.FC = () => {
         categories={categories}
         onAddSuggestedProduct={handleAddSuggestedProduct}
         logoUrl={logoUrl}
+        disabledScheduleSlots={disabledScheduleSlots}
       />
       <ProductModal 
         product={selectedProduct} 
@@ -1839,6 +1840,7 @@ const App: React.FC = () => {
         onLogUncoveredCep={(cep) => {
           sendOutOfAreaNotification(ntfyTopic, cep).catch(() => {});
         }}
+        disabledScheduleSlots={disabledScheduleSlots}
       />
       <AuthModal 
         isOpen={isAuthModalOpen} 
